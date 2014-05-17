@@ -19,46 +19,46 @@ public static class Functions : Defines
 
 	public static object ReadInt32(string str, int pos)
 	{
-		$int32 = unpack('N', substr($str, $pos, 4));
-		return $int32[1];
+		int32 = unpack('N', substr(str, pos, 4));
+		return int32[1];
 	}
 
 	public static object ReadInt64(string str, int pos)
 	{
-		$hi    = sprintf("%u", ReadInt32($str, $pos));
-		$lo    = sprintf("%u", ReadInt32($str, $pos + 4));
-		$int64 = bcadd(bcmul($hi, "4294967296"), $lo);
-		return $int64;
+		hi    = sprintf("%u", ReadInt32(str, pos));
+		lo    = sprintf("%u", ReadInt32(str, pos + 4));
+		int64 = bcadd(bcmul(hi, "4294967296"), lo);
+		return int64;
 	}
 
 	public static object ReadString(string str, int pos)
 	{
-		$len = 0;
-		while ($str[$pos + $len] != "\x00")
-			$len++;
-		$str = substr($str, $pos, $len);
-		$pos += $len + 1;
-		return $str;
+		int len = 0;
+		while (str[pos + len] != "\x00")
+			len++;
+		str = substr(str, pos, len);
+		pos += len + 1;
+		return str;
 	}
 
-	public static void ReadBoxHeader(string str, ref int pos, &$boxType, &$boxSize)
+	public static void ReadBoxHeader(string str, ref int pos, ref string boxType, ref int boxSize)
 	{
-		if (!isset($pos))
-			$pos = 0;
-		$boxSize = ReadInt32($str, $pos);
-		$boxType = substr($str, $pos + 4, 4);
-		if ($boxSize == 1)
+		if (pos == null)
+			pos = 0;
+		boxSize = ReadInt32(str, pos);
+		boxType = str.Substring(pos + 4, 4);
+		if (boxSize == 1)
 		{
-			$boxSize = ReadInt64($str, $pos + 8) - 16;
-			$pos += 16;
+			boxSize = ReadInt64(str, pos + 8) - 16;
+			pos += 16;
 		}
 		else
 		{
-			$boxSize -= 8;
-			$pos += 8;
+			boxSize -= 8;
+			pos += 8;
 		}
-		if ($boxSize <= 0)
-			$boxSize = 0;
+		if (boxSize <= 0)
+			boxSize = 0;
 	}
 
 	public static void WriteByte(ref string str, int pos, int int_v)
@@ -83,7 +83,7 @@ public static class Functions : Defines
 
 	public static void WriteBoxSize(ref string str, int pos, string type, int size)
 	{
-		if (substr(str, pos - 4, 4) == type)
+		if (str.Substring(pos - 4, 4) == type)
 			WriteInt32(str, pos - 8, size);
 		else
 		{
@@ -217,14 +217,14 @@ public static class Functions : Defines
 	{
 		if (msg)
 		{
-			printf("\r%-79s\r", "");
+			Console.WriteLine("\r%-79s\r", "");
 			if (progress)
-				printf("%s\r", msg);
+				Console.WriteLine("%s\r", msg);
 			else
-				printf("%s\n", msg);
+				Console.WriteLine("%s\n", msg);
 		}
 		else
-			printf("\n");
+			Console.WriteLine("\n");
 	}
 
 	public static string RemoveExtension(string outFile)
@@ -232,9 +232,9 @@ public static class Functions : Defines
 		string pattern = "\\.\\w{1,4}$";
 		string[] extension = Regex.Split(outFile, pattern, RegexOptions.IgnoreCase);
 
-		if (extension.length >= 1)
+		if (extension.Length >= 1)
 		{
-			outFile   = outFile.subString(0, -extension[0].length);
+			outFile   = outFile.Substring(0, -extension[0].Length);
 			return outFile;
 		}
 		return outFile;
@@ -273,10 +273,10 @@ public static class Functions : Defines
 	public static void ShowHeader()
 	{
 		string header = "KSV Adobe HDS Downloader";
-		int len       = header.length;
-		int width     = floor((80 - len) / 2) + len;
+		int len       = header.Length;
+		int width     = Math.Floor((80 - len) / 2) + len;
 		string format = "\n%" + width + "s\n\n";
-		printf(format, header);
+		Console.WriteLine(format, header);
 	}
 
 	public static object WriteFlvFile(string outFile)
@@ -290,7 +290,7 @@ public static class Functions : Defines
 	public static object WriteFlvFile(string outFile, bool audio, bool video)
 	{
 		string flvHeader = pack("H*", "464c5601050000000900000000");
-		int flvHeaderLen = flvHeader.length;
+		int flvHeaderLen = flvHeader.Length;
 
 		// Set proper Audio/Video marker
 		WriteByte(flvHeader, 4, audio << 2 | video);
@@ -307,9 +307,9 @@ public static class Functions : Defines
 
 	public static object WriteMetadata(F4F f4f, string flv)
 	{
-		if (f4f.media.length > 0 && f4f.media["metadata"])
+		if (f4f.media.Length > 0 && f4f.media["metadata"])
 		{
-			int metadataSize = f4f.media["metadata"].length;
+			int metadataSize = f4f.media["metadata"].Length;
 			WriteByte(metadata, 0, Defines.SCRIPT_DATA);
 			WriteInt24(metadata, 1, metadataSize);
 			WriteInt24(metadata, 4, 0);
