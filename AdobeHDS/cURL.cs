@@ -5,7 +5,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 
-public class cURL
+public class cURL : Functions
 {
 	string user_agent, compression;
 	WebHeaderCollection headers;
