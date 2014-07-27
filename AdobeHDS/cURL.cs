@@ -9,7 +9,7 @@ public class cURL : Functions
 {
 	string user_agent, compression;
 	WebHeaderCollection headers;
-	string response;
+	public string response;
 	NetworkStream response_stream;
 	bool cookies, cert_check;
 	CookieContainer cookieJar;

@@ -13,13 +13,13 @@ public static class Functions : Defines
 
 	public static object ReadInt24(string str, int pos)
 	{
-		int32 = unpack('N', "\x00" . substr(str, pos, 3));
+		int32 = unpack('N', "\x00" + str.Substring(pos, 3));
 		return int32[1];
 	}
 
 	public static object ReadInt32(string str, int pos)
 	{
-		int32 = unpack('N', substr(str, pos, 4));
+		int32 = unpack('N', str.Substring(pos, 4));
 		return int32[1];
 	}
 
@@ -36,7 +36,7 @@ public static class Functions : Defines
 		int len = 0;
 		while (str[pos + len] != "\x00")
 			len++;
-		str = substr(str, pos, len);
+		str = str.Substring(pos, len);
 		pos += len + 1;
 		return str;
 	}

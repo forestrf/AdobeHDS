@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Xml;
+using System.Net;
 
 
 public class F4F : Functions
 {
 	object audio, auth, baseFilename, baseTS, bootstrapUrl, baseUrl, debug, duration, fileCount, filesize, fixWindow;
-	object format, live, media, metadata, outDir, outFile, parallel, play, processed, quality, rename, video;
+	object format, media, metadata, outDir, outFile, parallel, play, processed, quality, rename, video;
 	object prevTagSize, tagHeaderLen;
 	object segTable, fragTable, segNum, fragNum, frags, fragCount, lastFrag, fragUrl, discontinuity;
 	object prevAudioTS, prevVideoTS, pAudioTagLen, pVideoTagLen, pAudioTagPos, pVideoTagPos;
@@ -22,7 +24,6 @@ public class F4F : Functions
 		this.fileCount     = 1;
 		this.fixWindow     = 1000;
 		this.format        = "";
-		this.live          = false;
 		this.metadata      = true;
 		this.outDir        = "";
 		this.outFile       = "";
@@ -31,11 +32,11 @@ public class F4F : Functions
 		this.processed     = false;
 		this.quality       = "high";
 		this.rename        = false;
-		this.segTable      = new Dictionary<string, object>;
-		this.fragTable     = new Dictionary<string, object>;
+		this.segTable      = new Dictionary<string, object>();
+		this.fragTable     = new Dictionary<string, object>();
 		this.segStart      = false;
 		this.fragStart     = false;
-		this.frags         = new Dictionary<string, object>;
+		this.frags         = new Dictionary<string, object>();
 		this.fragCount     = 0;
 		this.lastFrag      = 0;
 		this.discontinuity = "";
@@ -63,15 +64,24 @@ public class F4F : Functions
 		this.AAC_HeaderWritten = false;
 	}
 
-	public object GetManifest(cURL cc, string manifest)
+	public XmlDocument GetManifest(string manifest)
 	{
-		int status = cc.get(manifest);
-		if (status == 403)
-			LogError("Access Denied! Unable to download the manifest.");
-		else if (status != 200)
-			LogError("Unable to download the manifest");
-		xml = simplexml_load_string(trim(cc.response));
-		if (xml)
+		try{
+			string manifest_xml = new WebClient().DownloadString(manifest);
+		}
+		catch(Exception e){
+			LogError("Unable to download the manifest.");
+		}
+
+		XmlDocument xml = new XmlDocument();
+		xml.Load(cc.response.Trim());
+		XmlNode root = xml.DocumentElement;
+
+		// Add the namespace.
+		XmlNamespaceManager nsmgr = new XmlNamespaceManager(xml.NameTable);
+		nsmgr.AddNamespace("ns", "urn:newbooks-schema");
+
+		if (!xml.HasChildNodes)
 			LogError("Failed to load xml");
 		namespace_v = xml.getDocNamespaces();
 		namespace_v = namespace_v[""];
@@ -82,7 +92,7 @@ public class F4F : Functions
 	public static void ParseManifest(cURL cc, string parentManifest)
 	{
 		LogInfo("Processing manifest info....");
-		xml = this.GetManifest(cc, parentManifest);
+		XmlDocument xml = this.GetManifest(cc, parentManifest);
 
 		// Extract baseUrl from manifest url
 		string baseUrl;
@@ -272,49 +282,51 @@ public class F4F : Functions
 		int retries = 0;
 
 		// Backup original headers and add no-cache directive for fresh bootstrap info
+		// Hacer copia, no referencia, en la siguiente instrucción.
 		headers       = cc.headers;
 		cc.headers[] = "Cache-Control: no-cache";
 		cc.headers[] = "Pragma: no-cache";
 
-		while (($fragNum == this.fragCount) and ($retries < 30))
+		while (($fragNum == this.fragCount) and (retries < 30))
 		{
 			$bootstrapPos = 0;
 			LogDebug("Updating bootstrap info, Available fragments: " + this.fragCount);
-			$status = $cc->get($bootstrapUrl);
-			if ($status != 200)
+			int status = cc.get(bootstrapUrl);
+			if (status != 200)
 				LogError("Failed to refresh bootstrap info, Status: " + $status);
 			$bootstrapInfo = $cc->response;
-			ReadBoxHeader($bootstrapInfo, $bootstrapPos, $boxType, $boxSize);
-			if ($boxType == "abst")
+			string boxType;
+			int boxSize;
+			ReadBoxHeader($bootstrapInfo, $bootstrapPos, boxType, boxSize);
+			if (boxType == "abst")
 				this.ParseBootstrapBox($bootstrapInfo, $bootstrapPos);
 			else
 				LogError("Failed to parse bootstrap info");
 			LogDebug("Update complete, Available fragments: " + this.fragCount);
-			if ($fragNum == this.fragCount)
+			if (fragNum == this.fragCount)
 			{
-				LogInfo("Updating bootstrap info, Retries: " + ++$retries, true);
+				LogInfo("Updating bootstrap info, Retries: " + ++retries, true);
 				usleep(4000000);
 			}
 		}
 
 		// Restore original headers
-		$cc->headers = $headers;
+		cc.headers = headers;
 	}
 
-	function ParseBootstrapBox($bootstrapInfo, $pos)
+	public static void ParseBootstrapBox($bootstrapInfo, int pos)
 	{
-		$version          = ReadByte($bootstrapInfo, $pos);
-		$flags            = ReadInt24($bootstrapInfo, $pos + 1);
-		$bootstrapVersion = ReadInt32($bootstrapInfo, $pos + 4);
-		$byte             = ReadByte($bootstrapInfo, $pos + 8);
+		$version          = ReadByte($bootstrapInfo, pos);
+		$flags            = ReadInt24($bootstrapInfo, pos + 1);
+		$bootstrapVersion = ReadInt32($bootstrapInfo, pos + 4);
+		$byte             = ReadByte($bootstrapInfo, pos + 8);
 		$profile          = ($byte & 0xC0) >> 6;
 		if (($byte & 0x20) >> 5)
 		{
-			this.live     = true;
 			this.metadata = false;
 		}
-		$update = ($byte & 0x10) >> 4;
-		if (!$update)
+		bool update = ($byte & 0x10) >> 4;
+		if (!update)
 		{
 			this.segTable  = array();
 			this.fragTable = array();
@@ -322,25 +334,26 @@ public class F4F : Functions
 		$timescale           = ReadInt32($bootstrapInfo, $pos + 9);
 		$currentMediaTime    = ReadInt64($bootstrapInfo, $pos + 13);
 		$smpteTimeCodeOffset = ReadInt64($bootstrapInfo, $pos + 21);
-		$pos += 29;
-		$movieIdentifier  = ReadString($bootstrapInfo, $pos);
-		$serverEntryCount = ReadByte($bootstrapInfo, $pos++);
-		for ($i = 0; $i < $serverEntryCount; $i++)
-			$serverEntryTable[$i] = ReadString($bootstrapInfo, $pos);
-		$qualityEntryCount = ReadByte($bootstrapInfo, $pos++);
-		for ($i = 0; $i < $qualityEntryCount; $i++)
-			$qualityEntryTable[$i] = ReadString($bootstrapInfo, $pos);
-		$drmData          = ReadString($bootstrapInfo, $pos);
-		$metadata         = ReadString($bootstrapInfo, $pos);
-		$segRunTableCount = ReadByte($bootstrapInfo, $pos++);
+		pos += 29;
+		$movieIdentifier  = ReadString($bootstrapInfo, pos);
+		$serverEntryCount = ReadByte($bootstrapInfo, pos++);
+		for (int i = 0; i < $serverEntryCount; i++)
+			$serverEntryTable[i] = ReadString($bootstrapInfo, pos);
+		$qualityEntryCount = ReadByte($bootstrapInfo, pos++);
+		for (int i = 0; i < $qualityEntryCount; i++)
+			$qualityEntryTable[i] = ReadString($bootstrapInfo, pos);
+		$drmData          = ReadString($bootstrapInfo, pos);
+		$metadata         = ReadString($bootstrapInfo, pos);
+		$segRunTableCount = ReadByte($bootstrapInfo, pos++);
 		LogDebug(sprintf("%s:", "Segment Tables"));
-		for ($i = 0; $i < $segRunTableCount; $i++)
+		for (int i = 0; i < $segRunTableCount; i++)
 		{
-			LogDebug(sprintf("\nTable %d:", $i + 1));
-			ReadBoxHeader($bootstrapInfo, $pos, $boxType, $boxSize);
-			if ($boxType == "asrt")
-				$segTable[$i] = this.ParseAsrtBox($bootstrapInfo, $pos);
-			$pos += $boxSize;
+			LogDebug(sprintf("\nTable %d:", i + 1));
+			string boxType;
+			ReadBoxHeader($bootstrapInfo, pos, $boxType, $boxSize);
+			if (boxType == "asrt")
+				$segTable[i] = this.ParseAsrtBox($bootstrapInfo, pos);
+			pos += $boxSize;
 		}
 		$fragRunTableCount = ReadByte($bootstrapInfo, $pos++);
 		LogDebug(sprintf("%s:", "Fragment Tables"));
@@ -425,14 +438,6 @@ public class F4F : Functions
 		$firstFragment = reset(this.fragTable);
 		$lastFragment  = end(this.fragTable);
 
-		// Check if live stream is still live
-		if (($lastFragment["fragmentDuration"] == 0) and ($lastFragment["discontinuityIndicator"] == 0))
-		{
-			this.live = false;
-			array_pop(this.fragTable);
-			$lastFragment = end(this.fragTable);
-		}
-
 		// Count total fragments by adding all entries in compactly coded segment table
 		$invalidFragCount = false;
 		$prev             = reset(this.segTable);
@@ -456,19 +461,13 @@ public class F4F : Functions
 		// Determine starting segment and fragment
 		if (this.segStart === false)
 		{
-			if (this.live)
-				this.segStart = $lastSegment["firstSegment"];
-			else
-				this.segStart = $firstSegment["firstSegment"];
+			this.segStart = $firstSegment["firstSegment"];
 			if (this.segStart < 1)
 				this.segStart = 1;
 		}
 		if (this.fragStart === false)
 		{
-			if (this.live and !$invalidFragCount)
-				this.fragStart = this.fragCount - 2;
-			else
-				this.fragStart = $firstFragment["firstFragment"] - 1;
+			this.fragStart = $firstFragment["firstFragment"] - 1;
 			if (this.fragStart < 0)
 				this.fragStart = 0;
 		}
@@ -605,8 +604,7 @@ public class F4F : Functions
 						if (this.VerifyFragment($download["response"]))
 						{
 							LogDebug("Fragment " + this.baseFilename . $download["id"] . " successfully downloaded");
-							if (!(this.live or this.play))
-								file_put_contents(this.baseFilename . $download["id"], $download["response"]);
+							file_put_contents(this.baseFilename . $download["id"], $download["response"]);
 							$frag["response"] = $download["response"];
 						}
 						else
@@ -635,20 +633,6 @@ public class F4F : Functions
 						LogDebug("Fragment " + $download["id"] . " doesn't exist, Status: " + $download["status"]);
 						$frag["response"] = false;
 						this.rename     = true;
-
-						/* Resync with latest available fragment when we are left behind due to slow *
-                   * connection and short live window on streaming server. make sure to reset  *
-                   * the last written fragment.                                                */
-						if (this.live and ($fragNum >= this.fragCount) and ($i + 1 == count($downloads)) and !$cc->active)
-						{
-							LogDebug("Trying to resync with latest available fragment");
-							if (this.WriteFragment($frag, $opt) === STOP_PROCESSING)
-								break 2;
-							unset($frag["response"]);
-							this.UpdateBootstrapInfo($cc, this.bootstrapUrl);
-							$fragNum        = this.fragCount - 1;
-							this.lastFrag = $fragNum;
-						}
 					}
 					if (isset($frag["response"]))
 					if (this.WriteFragment($frag, $opt) === STOP_PROCESSING)
@@ -656,8 +640,6 @@ public class F4F : Functions
 				}
 				unset($downloads, $download);
 			}
-			if (this.live and ($fragNum >= this.fragCount) and !$cc->active)
-				this.UpdateBootstrapInfo($cc, this.bootstrapUrl);
 		}
 
 		LogInfo("");
