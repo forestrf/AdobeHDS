@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Xml;
 using System.Net;
+using System.Diagnostics;
 
 
 public class F4F : Functions
@@ -70,22 +71,25 @@ public class F4F : Functions
 
 		XmlDocument doc = new XmlDocument ();
 		try {
-			doc.Load (manifest);
-		} catch (Exception e) {
-			try {
-				doc.LoadXml (manifest);
-			} catch (Exception f) {
-				LogError ("Unable to download the manifest");
-				return;
-			}
-		}
+			string manifest_xml =  "<?xml version=\"1.0\" encoding=\"utf-8\"?><manifest xmlns=\"http://ns.adobe.com/f4m/1.0\"><id>assets5/2014/07/25/59508586-1ACD-446B-9A90-2128427BC6A8/es.smil</id><width>1280</width><height>720</height><duration>853.88</duration><mimeType>video/mp4</mimeType><streamType>recorded</streamType><deliveryType>streaming</deliveryType><bootstrapInfo profile=\"named\" id=\"bootstrap1\">AAAFvmFic3QBAAAAAAAAAQAAAAPoAAAAAAANB3gAAAAAAAAAAAABAAEAAAABAAAAGmFzcnQBAAAAAQAAAAABAAAAAQAAAFYBAAAFdmFmcnQBAAAAAAAD6AEAAAAAVgAAAAEAAAAAAAAAAAAAJxAAAAACAAAAAAAAJxAAACcQAAAAAwAAAAAAAE4gAAAnEAAAAAQAAAAAAAB1MAAAJxAAAAAFAAAAAAAAnEAAACcQAAAABgAAAAAAAMNQAAAnEAAAAAcAAAAAAADqYAAAJxAAAAAIAAAAAAABEXAAACcQAAAACQAAAAAAATiAAAAnEAAAAAoAAAAAAAFfkAAAJxAAAAALAAAAAAABhqAAACcQAAAADAAAAAAAAa2wAAAnEAAAAA0AAAAAAAHUwAAAJxAAAAAOAAAAAAAB+9AAACcQAAAADwAAAAAAAiLgAAAnEAAAABAAAAAAAAJJ8AAAJxAAAAARAAAAAAACcQAAACcQAAAAEgAAAAAAApgQAAAnEAAAABMAAAAAAAK/IAAAJxAAAAAUAAAAAAAC5jAAACcQAAAAFQAAAAAAAw1AAAAnEAAAABYAAAAAAAM0UAAAJxAAAAAXAAAAAAADW2AAACcQAAAAGAAAAAAAA4JwAAAnEAAAABkAAAAAAAOpgAAAJxAAAAAaAAAAAAAD0JAAACcQAAAAGwAAAAAAA/egAAAnEAAAABwAAAAAAAQesAAAJxAAAAAdAAAAAAAERcAAACcQAAAAHgAAAAAABGzQAAAnEAAAAB8AAAAAAAST4AAAJxAAAAAgAAAAAAAEuvAAACcQAAAAIQAAAAAABOIAAAAnEAAAACIAAAAAAAUJEAAAJxAAAAAjAAAAAAAFMCAAACcQAAAAJAAAAAAABVcwAAAnEAAAACUAAAAAAAV+QAAAJxAAAAAmAAAAAAAFpVAAACcQAAAAJwAAAAAABcxgAAAnEAAAACgAAAAAAAXzcAAAJxAAAAApAAAAAAAGGoAAACcQAAAAKgAAAAAABkGQAAAnEAAAACsAAAAAAAZooAAAJxAAAAAsAAAAAAAGj7AAACcQAAAALQAAAAAABrbAAAAnEAAAAC4AAAAAAAbd0AAAJxAAAAAvAAAAAAAHBOAAACcQAAAAMAAAAAAAByvwAAAnEAAAADEAAAAAAAdTAAAAJxAAAAAyAAAAAAAHehAAACcQAAAAMwAAAAAAB6EgAAAnEAAAADQAAAAAAAfIMAAAJxAAAAA1AAAAAAAH70AAACcQAAAANgAAAAAACBZQAAAnEAAAADcAAAAAAAg9YAAAJxAAAAA4AAAAAAAIZHAAACcQAAAAOQAAAAAACIuAAAAnEAAAADoAAAAAAAiykAAAJxAAAAA7AAAAAAAI2aAAACcQAAAAPAAAAAAACQCwAAAnEAAAAD0AAAAAAAknwAAAJxAAAAA+AAAAAAAJTtAAACcQAAAAPwAAAAAACXXgAAAnEAAAAEAAAAAAAAmc8AAAJxAAAABBAAAAAAAJxAAAACcQAAAAQgAAAAAACesQAAAnEAAAAEMAAAAAAAoSIAAAJxAAAABEAAAAAAAKOTAAACcQAAAARQAAAAAACmBAAAAnEAAAAEYAAAAAAAqHUAAAJxAAAABHAAAAAAAKrmAAACcQAAAASAAAAAAACtVwAAAnEAAAAEkAAAAAAAr8gAAAJxAAAABKAAAAAAALI5AAACcQAAAASwAAAAAAC0qgAAAnEAAAAEwAAAAAAAtxsAAAJxAAAABNAAAAAAALmMAAACcQAAAATgAAAAAAC7/QAAAnEAAAAE8AAAAAAAvm4AAAJxAAAABQAAAAAAAMDfAAACcQAAAAUQAAAAAADDUAAAAnEAAAAFIAAAAAAAxcEAAAJxAAAABTAAAAAAAMgyAAACbAAAAAVAAAAAAADKngAAAnEAAAAFUAAAAAAAzQ8AAAJxAAAABWAAAAAAAM+AAAAA94</bootstrapInfo><media streamId=\"1\" bootstrapInfoId=\"bootstrap1\" width=\"640\" height=\"360\" bitrate=\"707\" url=\"media_b724000.abst/\"><metadata>AgAKb25NZXRhRGF0YQgAAAAAAAl0cmFja2luZm8KAAAAAgMACGxhbmd1YWdlAgADdW5kAAl0aW1lc2NhbGUAQPX5AAAAAAAABmxlbmd0aABBklKAwAAAAAARc2FtcGxlZGVzY3JpcHRpb24KAAAAAQMACnNhbXBsZXR5cGUCAARhdmMxAAAJAAAJAwAIbGFuZ3VhZ2UCAAN1bmQACXRpbWVzY2FsZQBA53AAAAAAAAAGbGVuZ3RoAEGDinwAAAAAABFzYW1wbGVkZXNjcmlwdGlvbgoAAAABAwAKc2FtcGxldHlwZQIABG1wNGEAAAkAAAkADWF1ZGlvY2hhbm5lbHMAQAAAAAAAAAAAD2F1ZGlvc2FtcGxlcmF0ZQBA53AAAAAAAAAOdmlkZW9mcmFtZXJhdGUAQDkAAAAAAAAABmFhY2FvdABAAAAAAAAAAAAIYXZjbGV2ZWwAQD4AAAAAAAAACmF2Y3Byb2ZpbGUAQFNAAAAAAAAADGF1ZGlvY29kZWNpZAIABG1wNGEADHZpZGVvY29kZWNpZAIABGF2YzEABXdpZHRoAECEAAAAAAAAAAZoZWlnaHQAQHaAAAAAAAAACmZyYW1lV2lkdGgAQIQAAAAAAAAAC2ZyYW1lSGVpZ2h0AEB2gAAAAAAAAAxkaXNwbGF5V2lkdGgAQIQAAAAAAAAADWRpc3BsYXlIZWlnaHQAQHaAAAAAAAAACWZyYW1lcmF0ZQBAOQAAAAAAAAAMbW9vdnBvc2l0aW9uAEBEAAAAAAAAAAhkdXJhdGlvbgBAiq8KPXCj1wAACQ==</metadata></media><media streamId=\"2\" bootstrapInfoId=\"bootstrap1\" width=\"640\" height=\"360\" bitrate=\"1029\" url=\"media_b1054000.abst/\"><metadata>AgAKb25NZXRhRGF0YQgAAAAAAAl0cmFja2luZm8KAAAAAgMACGxhbmd1YWdlAgADdW5kAAl0aW1lc2NhbGUAQPX5AAAAAAAABmxlbmd0aABBklKAwAAAAAARc2FtcGxlZGVzY3JpcHRpb24KAAAAAQMACnNhbXBsZXR5cGUCAARhdmMxAAAJAAAJAwAIbGFuZ3VhZ2UCAAN1bmQACXRpbWVzY2FsZQBA53AAAAAAAAAGbGVuZ3RoAEGDinwAAAAAABFzYW1wbGVkZXNjcmlwdGlvbgoAAAABAwAKc2FtcGxldHlwZQIABG1wNGEAAAkAAAkADWF1ZGlvY2hhbm5lbHMAQAAAAAAAAAAAD2F1ZGlvc2FtcGxlcmF0ZQBA53AAAAAAAAAOdmlkZW9mcmFtZXJhdGUAQDkAAAAAAAAABmFhY2FvdABAAAAAAAAAAAAIYXZjbGV2ZWwAQD4AAAAAAAAACmF2Y3Byb2ZpbGUAQFNAAAAAAAAADGF1ZGlvY29kZWNpZAIABG1wNGEADHZpZGVvY29kZWNpZAIABGF2YzEABXdpZHRoAECEAAAAAAAAAAZoZWlnaHQAQHaAAAAAAAAACmZyYW1lV2lkdGgAQIQAAAAAAAAAC2ZyYW1lSGVpZ2h0AEB2gAAAAAAAAAxkaXNwbGF5V2lkdGgAQIQAAAAAAAAADWRpc3BsYXlIZWlnaHQAQHaAAAAAAAAACWZyYW1lcmF0ZQBAOQAAAAAAAAAMbW9vdnBvc2l0aW9uAEBEAAAAAAAAAAhkdXJhdGlvbgBAiq8KPXCj1wAACQ==</metadata></media><media streamId=\"3\" bootstrapInfoId=\"bootstrap1\" width=\"720\" height=\"404\" bitrate=\"1458\" url=\"media_b1494000.abst/\"><metadata>AgAKb25NZXRhRGF0YQgAAAAAAAl0cmFja2luZm8KAAAAAgMACGxhbmd1YWdlAgADdW5kAAl0aW1lc2NhbGUAQPX5AAAAAAAABmxlbmd0aABBklKAwAAAAAARc2FtcGxlZGVzY3JpcHRpb24KAAAAAQMACnNhbXBsZXR5cGUCAARhdmMxAAAJAAAJAwAIbGFuZ3VhZ2UCAAN1bmQACXRpbWVzY2FsZQBA53AAAAAAAAAGbGVuZ3RoAEGDinwAAAAAABFzYW1wbGVkZXNjcmlwdGlvbgoAAAABAwAKc2FtcGxldHlwZQIABG1wNGEAAAkAAAkADWF1ZGlvY2hhbm5lbHMAQAAAAAAAAAAAD2F1ZGlvc2FtcGxlcmF0ZQBA53AAAAAAAAAOdmlkZW9mcmFtZXJhdGUAQDkAAAAAAAAABmFhY2FvdABAAAAAAAAAAAAIYXZjbGV2ZWwAQD4AAAAAAAAACmF2Y3Byb2ZpbGUAQFNAAAAAAAAADGF1ZGlvY29kZWNpZAIABG1wNGEADHZpZGVvY29kZWNpZAIABGF2YzEABXdpZHRoAECGaAAAAAAAAAZoZWlnaHQAQHlAAAAAAAAACmZyYW1lV2lkdGgAQIaAAAAAAAAAC2ZyYW1lSGVpZ2h0AEB5QAAAAAAAAAxkaXNwbGF5V2lkdGgAQIZoAAAAAAAADWRpc3BsYXlIZWlnaHQAQHlAAAAAAAAACWZyYW1lcmF0ZQBAOQAAAAAAAAAMbW9vdnBvc2l0aW9uAEBEAAAAAAAAAAhkdXJhdGlvbgBAiq8KPXCj1wAACQ==</metadata></media><bootstrapInfo profile=\"named\" id=\"bootstrap2\">AAAFvmFic3QBAAAAAAAAAQAAAAPoAAAAAAANBygAAAAAAAAAAAABAAEAAAABAAAAGmFzcnQBAAAAAQAAAAABAAAAAQAAAFYBAAAFdmFmcnQBAAAAAAAD6AEAAAAAVgAAAAEAAAAAAAAAAAAAJxAAAAACAAAAAAAAJxAAACcQAAAAAwAAAAAAAE4gAAAnEAAAAAQAAAAAAAB1MAAAJxAAAAAFAAAAAAAAnEAAACcQAAAABgAAAAAAAMNQAAAnEAAAAAcAAAAAAADqYAAAJxAAAAAIAAAAAAABEXAAACcQAAAACQAAAAAAATiAAAAnEAAAAAoAAAAAAAFfkAAAJxAAAAALAAAAAAABhqAAACcQAAAADAAAAAAAAa2wAAAnEAAAAA0AAAAAAAHUwAAAJxAAAAAOAAAAAAAB+9AAACcQAAAADwAAAAAAAiLgAAAnEAAAABAAAAAAAAJJ8AAAJxAAAAARAAAAAAACcQAAACcQAAAAEgAAAAAAApgQAAAnEAAAABMAAAAAAAK/IAAAJxAAAAAUAAAAAAAC5jAAACcQAAAAFQAAAAAAAw1AAAAnEAAAABYAAAAAAAM0UAAAJxAAAAAXAAAAAAADW2AAACcQAAAAGAAAAAAAA4JwAAAnEAAAABkAAAAAAAOpgAAAJxAAAAAaAAAAAAAD0JAAACcQAAAAGwAAAAAAA/egAAAnEAAAABwAAAAAAAQesAAAJxAAAAAdAAAAAAAERcAAACcQAAAAHgAAAAAABGzQAAAnEAAAAB8AAAAAAAST4AAAJxAAAAAgAAAAAAAEuvAAACcQAAAAIQAAAAAABOIAAAAnEAAAACIAAAAAAAUJEAAAJxAAAAAjAAAAAAAFMCAAACcQAAAAJAAAAAAABVcwAAAnEAAAACUAAAAAAAV+QAAAJxAAAAAmAAAAAAAFpVAAACcQAAAAJwAAAAAABcxgAAAnEAAAACgAAAAAAAXzcAAAJxAAAAApAAAAAAAGGoAAACcQAAAAKgAAAAAABkGQAAAnEAAAACsAAAAAAAZooAAAJxAAAAAsAAAAAAAGj7AAACcQAAAALQAAAAAABrbAAAAnEAAAAC4AAAAAAAbd0AAAJxAAAAAvAAAAAAAHBOAAACcQAAAAMAAAAAAAByvwAAAnEAAAADEAAAAAAAdTAAAAJxAAAAAyAAAAAAAHehAAACcQAAAAMwAAAAAAB6EgAAAnEAAAADQAAAAAAAfIMAAAJxAAAAA1AAAAAAAH70AAACcQAAAANgAAAAAACBZQAAAnEAAAADcAAAAAAAg9YAAAJxAAAAA4AAAAAAAIZHAAACcQAAAAOQAAAAAACIuAAAAnEAAAADoAAAAAAAiykAAAJxAAAAA7AAAAAAAI2aAAACcQAAAAPAAAAAAACQCwAAAnEAAAAD0AAAAAAAknwAAAJxAAAAA+AAAAAAAJTtAAACcQAAAAPwAAAAAACXXgAAAnEAAAAEAAAAAAAAmc8AAAJxAAAABBAAAAAAAJxAAAACcQAAAAQgAAAAAACesQAAAnEAAAAEMAAAAAAAoSIAAAJxAAAABEAAAAAAAKOTAAACcQAAAARQAAAAAACmBAAAAnEAAAAEYAAAAAAAqHUAAAJxAAAABHAAAAAAAKrmAAACcQAAAASAAAAAAACtVwAAAnEAAAAEkAAAAAAAr8gAAAJxAAAABKAAAAAAALI5AAACcQAAAASwAAAAAAC0qgAAAnEAAAAEwAAAAAAAtxsAAAJxAAAABNAAAAAAALmMAAACcQAAAATgAAAAAAC7/QAAAnEAAAAE8AAAAAAAvm4AAAJxAAAABQAAAAAAAMDfAAACcQAAAAUQAAAAAADDUAAAAnEAAAAFIAAAAAAAxcEAAAJxAAAABTAAAAAAAMgyAAACbAAAAAVAAAAAAADKngAAAnEAAAAFUAAAAAAAzQ8AAAJxAAAABWAAAAAAAM+AAAAA8o</bootstrapInfo><media streamId=\"4\" bootstrapInfoId=\"bootstrap2\" width=\"1280\" height=\"720\" bitrate=\"1996\" url=\"media_b2044000.abst/\"><metadata>AgAKb25NZXRhRGF0YQgAAAAAAAl0cmFja2luZm8KAAAAAgMACGxhbmd1YWdlAgADdW5kAAl0aW1lc2NhbGUAQPX5AAAAAAAABmxlbmd0aABBklIQQAAAAAARc2FtcGxlZGVzY3JpcHRpb24KAAAAAQMACnNhbXBsZXR5cGUCAARhdmMxAAAJAAAJAwAIbGFuZ3VhZ2UCAAN1bmQACXRpbWVzY2FsZQBA53AAAAAAAAAGbGVuZ3RoAEGDihwAAAAAABFzYW1wbGVkZXNjcmlwdGlvbgoAAAABAwAKc2FtcGxldHlwZQIABG1wNGEAAAkAAAkADWF1ZGlvY2hhbm5lbHMAQAAAAAAAAAAAD2F1ZGlvc2FtcGxlcmF0ZQBA53AAAAAAAAAOdmlkZW9mcmFtZXJhdGUAQDkAAAAAAAAABmFhY2FvdABAAAAAAAAAAAAIYXZjbGV2ZWwAQD8AAAAAAAAACmF2Y3Byb2ZpbGUAQFNAAAAAAAAADGF1ZGlvY29kZWNpZAIABG1wNGEADHZpZGVvY29kZWNpZAIABGF2YzEABXdpZHRoAECUAAAAAAAAAAZoZWlnaHQAQIaAAAAAAAAACmZyYW1lV2lkdGgAQJQAAAAAAAAAC2ZyYW1lSGVpZ2h0AECGgAAAAAAAAAxkaXNwbGF5V2lkdGgAQJQAAAAAAAAADWRpc3BsYXlIZWlnaHQAQIaAAAAAAAAACWZyYW1lcmF0ZQBAOQAAAAAAAAAMbW9vdnBvc2l0aW9uAEBEAAAAAAAAAAhkdXJhdGlvbgBAiq5mZmZmZgAACQ==</metadata></media></manifest>";
+			//manifest_xml = new WebClient().DownloadString(manifest);
 
-		Manifest_parsed manifest_parsed = new Manifest_parsed ();
+			// Remove annoying manifests
+			int nm_i = manifest_xml.IndexOf("xmlns");
+			string nm = manifest_xml.Substring(nm_i, manifest_xml.IndexOf("\"", nm_i + 9) -nm_i +1);
+			Debug.WriteLine("namespace removed:" + nm);
+			manifest_xml = manifest_xml.Replace (nm, "");
+
+			doc.LoadXml (manifest_xml);
+		} catch (Exception e) {
+			LogError ("Unable to download the manifest: "+e);
+			return;
+		}
 
 
 		string baseUrl;
-		XmlNode node_baseURL = doc.SelectSingleNode ("/ns:manifest/ns:baseURL");
-		if (node_baseURL) {
+		XmlNode node_baseURL = doc.SelectSingleNode ("/manifest/baseURL");
+		if (node_baseURL != null) {
 			baseUrl = node_baseURL.InnerText;
 		} else {
 			baseUrl = manifest;
@@ -93,68 +97,61 @@ public class F4F : Functions
 			if (pos_int != -1) {
 				baseUrl = baseUrl.Substring (0, pos_int);
 			}
-			baseUrl = baseUrl.IndexOf (0, baseUrl.LastIndexOf ("/"));
+			baseUrl = baseUrl.Substring (0, baseUrl.LastIndexOf ("/"));
 		}
 
 
+		List<Manifest_parsed_media> manifest_parsed_media_list = new List<Manifest_parsed_media> ();
 
 
+		XmlNodeList nodes = doc.DocumentElement.SelectNodes ("/manifest/media");
 
-		XmlNodeList nodes = doc.SelectNodes ("/ns:manifest/ns:media");
-
-		int false_bitrate_placeholder = 0;
+		Console.WriteLine (nodes.Count);
 
 		foreach (XmlNode node in nodes) {
-			/*if (node.Name == "bootstrapInfo") {
-				if (node.Attributes ["id"]) {
-					if (node.Attributes ["url"].Specified) {
-						manifest_parsed.bootstrapInfo.Add (node.Attributes ["id"].InnerText, new WebClient ().DownloadString (node.Attributes ["url"].InnerText));
-					} else {
-						manifest_parsed.bootstrapInfo.Add (node.Attributes ["id"].InnerText, node.InnerText);
-					}
-				} else {
-					manifest_parsed.bootstrapInfo.Add (node.InnerText);
-				}
-			}*/
 
 			// Media can be a child manifest, a fragment of the manifest in another file (not implemented)
 			Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
 			manifest_parsed_media.metadata = node ["metadata"].InnerText;
 
-			if (node.Attributes ["bitrate"]) {
+			if (node.Attributes ["bitrate"] != null) {
 				manifest_parsed_media.bitrate = int.Parse (node.Attributes ["bitrate"].InnerText);
 			}
 			manifest_parsed_media.baseUrl = baseUrl;
-			manifest_parsed_media.url = node ["url"];
+			manifest_parsed_media.url = node.Attributes ["url"].InnerText;
 
-			foreach (XmlAttribute node_media in node.Attributes) {
-				switch (node_media.Name) {
-				case "bootstrapInfoId":
-					manifest_parsed_media.bootstrap = doc.SelectSingleNode ("/ns:manifest/ns:bootstrapInfo[@id='" + node.InnerText.ToLower () + "']");
-					break;
-				case "bitrate":
-					manifest_parsed_media.bitrate = int.Parse (node_media.InnerText);
-					break;
-				case "url":
-					if (node_media.InnerText.IndexOf ("rtmp") == 0) {
-						LogError ("Provided manifest is not a valid HDS manifest");
-						return;
-					}
-					int idx = node_media.InnerText.IndexOf ("?");
-					if (idx > -1) {
-						manifest_parsed_media.queryString = node_media.InnerText.Substring (idx);
-						manifest_parsed_media.url = node_media.InnerText.Substring (0, idx);
-					} else {
-						// manifest_parsed_media.queryString = global auth;
-						manifest_parsed_media.url = node_media.InnerText;
-					}
-					break;
-				}
+			if (manifest_parsed_media.baseUrl.IndexOf ("rtmp") == 0 || manifest_parsed_media.url.IndexOf ("rtmp") == 0) {
+				LogError ("Provided manifest is not a valid HDS manifest");
+				return;
 			}
-			if (!manifest_parsed_media.bootstrap) {
-				manifest_parsed_media.bootstrap = nodes ["bootstrapInfo"].InnerText;
+
+			int idx = manifest_parsed_media.url.IndexOf ("?");
+			if (idx > -1) {
+				manifest_parsed_media.queryString = manifest_parsed_media.url.Substring (idx);
+				manifest_parsed_media.url = manifest_parsed_media.url.Substring (0, idx);
+			}/* else {
+				// manifest_parsed_media.queryString = global auth;
+			}*/
+
+			XmlElement bootstrapInfoId = node ["bootstrapInfoId"];
+			XmlNode bootstrap;
+			if (bootstrapInfoId != null) {
+				bootstrap = doc.SelectSingleNode ("/manifest/bootstrapInfo[@id='" + node.InnerText.ToLower () + "']");
+			} else {
+				bootstrap = doc.SelectSingleNode ("/manifest/bootstrapInfo");
 			}
-			manifest_parsed.media.Add (manifest_parsed_media);
+
+			if (bootstrap.Attributes ["url"] != null) {
+				// download bootstrap
+			} else {
+				manifest_parsed_media.bootstrap = Base64Decode(bootstrap.InnerText);
+			}
+
+			if (node.Attributes ["metadata"] != null) {
+				manifest_parsed_media.metadata = node ["metadata"].InnerText;
+			}
+
+			manifest_parsed_media_list.Add (manifest_parsed_media);
 			
 		}
 
@@ -1093,22 +1090,6 @@ public class F4F : Functions
 			unset(this.frags);
 		return true;
 	*/
-	}
-}
-
-class Manifest_parsed
-{
-	public Dictionary<string, string> bootstrapInfo = new Dictionary<string, string> ();
-	public List<Manifest_parsed_media> media = new List<Manifest_parsed_media> ();
-
-	public Manifest_parsed ()
-	{
-	}
-
-	public Manifest_parsed (Dictionary<string, string> bootstrapInfo, List<Manifest_parsed_media> media)
-	{
-		this.bootstrapInfo = bootstrapInfo;
-		this.media = media;
 	}
 }
 
