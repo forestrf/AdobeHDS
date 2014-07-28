@@ -66,6 +66,8 @@ public class F4F : Functions
 
 	public void ParseManifest (string manifest)
 	{
+		LogInfo ("Processing manifest info....");
+
 		XmlDocument doc = new XmlDocument ();
 		try {
 			doc.Load (manifest);
@@ -74,48 +76,91 @@ public class F4F : Functions
 				doc.LoadXml (manifest);
 			} catch (Exception f) {
 				LogError ("Unable to download the manifest");
-				// END HERE
 				return;
 			}
 		}
 
 		Manifest_parsed manifest_parsed = new Manifest_parsed ();
 
-		XmlNodeList nodes = doc.DocumentElement.ChildNodes;
-		//manifest_parsed
-		foreach (XmlNode node in nodes) {
-			switch (node.Name) {
-			case "bootstrapInfo":
-				manifest_parsed.bootstrapInfo.Add (node.Attributes ["id"].InnerText, node.InnerText);
-				break;
-			case "media":
-				Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
-				manifest_parsed_media.metadata = node.InnerText;
-				foreach (XmlAttribute node_media in node.Attributes) {
-					switch (node_media.Name) {
-					case "bootstrapInfoId":
-						manifest_parsed_media.bootstrapInfoId = node_media.InnerText;
-						break;
-					case "width":
-						manifest_parsed_media.width = int.Parse(node_media.InnerText);
-						break;
-					case "height":
-						manifest_parsed_media.height = int.Parse(node_media.InnerText);
-						break;
-					case "bitrate":
-						manifest_parsed_media.bitrate = int.Parse(node_media.InnerText);
-						break;
-					case "url":
-						manifest_parsed_media.url = node_media.InnerText;
-						break;
-					}
-				}
-				manifest_parsed.media.Add (manifest_parsed_media);
-				break;
+
+		string baseUrl;
+		XmlNode node_baseURL = doc.SelectSingleNode ("/ns:manifest/ns:baseURL");
+		if (node_baseURL) {
+			baseUrl = node_baseURL.InnerText;
+		} else {
+			baseUrl = manifest;
+			int pos_int = baseUrl.IndexOf ("?");
+			if (pos_int != -1) {
+				baseUrl = baseUrl.Substring (0, pos_int);
 			}
+			baseUrl = baseUrl.IndexOf (0, baseUrl.LastIndexOf ("/"));
 		}
 
-		manifest_parsed = manifest_parsed;
+
+
+
+
+		XmlNodeList nodes = doc.SelectNodes ("/ns:manifest/ns:media");
+
+		int false_bitrate_placeholder = 0;
+
+		foreach (XmlNode node in nodes) {
+			/*if (node.Name == "bootstrapInfo") {
+				if (node.Attributes ["id"]) {
+					if (node.Attributes ["url"].Specified) {
+						manifest_parsed.bootstrapInfo.Add (node.Attributes ["id"].InnerText, new WebClient ().DownloadString (node.Attributes ["url"].InnerText));
+					} else {
+						manifest_parsed.bootstrapInfo.Add (node.Attributes ["id"].InnerText, node.InnerText);
+					}
+				} else {
+					manifest_parsed.bootstrapInfo.Add (node.InnerText);
+				}
+			}*/
+
+			// Media can be a child manifest, a fragment of the manifest in another file (not implemented)
+			Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
+			manifest_parsed_media.metadata = node ["metadata"].InnerText;
+
+			if (node.Attributes ["bitrate"]) {
+				manifest_parsed_media.bitrate = int.Parse (node.Attributes ["bitrate"].InnerText);
+			}
+			manifest_parsed_media.baseUrl = baseUrl;
+			manifest_parsed_media.url = node ["url"];
+
+			foreach (XmlAttribute node_media in node.Attributes) {
+				switch (node_media.Name) {
+				case "bootstrapInfoId":
+					manifest_parsed_media.bootstrap = doc.SelectSingleNode ("/ns:manifest/ns:bootstrapInfo[@id='" + node.InnerText.ToLower () + "']");
+					break;
+				case "bitrate":
+					manifest_parsed_media.bitrate = int.Parse (node_media.InnerText);
+					break;
+				case "url":
+					if (node_media.InnerText.IndexOf ("rtmp") == 0) {
+						LogError ("Provided manifest is not a valid HDS manifest");
+						return;
+					}
+					int idx = node_media.InnerText.IndexOf ("?");
+					if (idx > -1) {
+						manifest_parsed_media.queryString = node_media.InnerText.Substring (idx);
+						manifest_parsed_media.url = node_media.InnerText.Substring (0, idx);
+					} else {
+						// manifest_parsed_media.queryString = global auth;
+						manifest_parsed_media.url = node_media.InnerText;
+					}
+					break;
+				}
+			}
+			if (!manifest_parsed_media.bootstrap) {
+				manifest_parsed_media.bootstrap = nodes ["bootstrapInfo"].InnerText;
+			}
+			manifest_parsed.media.Add (manifest_parsed_media);
+			
+		}
+
+		// Manifest parsed.
+
+
 
 
 
@@ -1069,26 +1114,15 @@ class Manifest_parsed
 
 class Manifest_parsed_media
 {
-	public string bootstrapInfoId;
-	public int width;
-	public int height;
 	public int bitrate;
-	public string url;
 
+	public string baseUrl;
+	public string url;
+	public string queryString;
+	public string bootstrap;
 	public string metadata;
 
 	public Manifest_parsed_media ()
 	{
-	}
-
-	public Manifest_parsed_media (string bootstrapInfoId, int width, int height, int bitrate, string url, string metadata)
-	{
-		this.bootstrapInfoId = bootstrapInfoId;
-		this.width = width;
-		this.height = height;
-		this.bitrate = bitrate;
-		this.url = url;
-
-		this.metadata = metadata;
 	}
 }
