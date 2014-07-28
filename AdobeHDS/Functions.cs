@@ -17,7 +17,12 @@ public class Functions : Defines
 
 	public string ReadString(byte[] str, int start, int length)
 	{
-		return BitConverter.ToString (str, start, length);
+		return Encoding.UTF8.GetString (str, start, length);
+	}
+
+	public string ReadString(byte[] str, int start)
+	{
+		return Encoding.UTF8.GetString (str, start);
 	}
 
 	public long ReadInt32(byte[] str, int pos)
@@ -31,17 +36,6 @@ public class Functions : Defines
 		long res = BitConverter.ToInt64 (str, pos);
 		return BitConverter.IsLittleEndian ? SwapInt64 (res) : res;
 	}
-/*
-	public static object ReadString(string str, int pos)
-	{
-		int len = 0;
-		while (str[pos + len] != "\x00")
-			len++;
-		str = str.Substring(pos, len);
-		pos += len + 1;
-		return str;
-	}
-*/
 
 	public short SwapInt16(short v){
 		return (short)(((v & 0xff) << 8) | ((v >> 8) & 0xff));

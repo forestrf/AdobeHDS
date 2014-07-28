@@ -175,65 +175,16 @@ public class F4F : Functions
 		long boxSize = 0;
 		string boxType = "";
 		ReadBoxHeader(media_target.bootstrap, ref pos, ref boxType, ref boxSize);
-		/*if (boxType == "abst") {
+
+		if (boxType == "abst") {
 			ParseBootstrapBox (bootstrapInfo, pos);
 		} else {
 			LogError ("Failed to parse bootstrap info");
 			return;
-		}*/
+		}
 
 
 		/*
-
-		// Available qualities
-		$bitrates = array();
-		if (!count(this.media))
-			LogError("No media entry found");
-		krsort(this.media, SORT_NUMERIC);
-		LogDebug("Manifest Entries:\n");
-		LogDebug(sprintf(" %-8s%s", "Bitrate", "URL"));
-		for ($i = 0; $i < count(this.media); $i++)
-		{
-			$key        = KeyName(this.media, $i);
-			$bitrates[] = $key;
-			LogDebug(sprintf(" %-8d%s", $key, this.media[$key]["url"]));
-		}
-		LogDebug("");
-		LogInfo("Quality Selection:\n Available: " + implode(' ', bitrates));
-
-		// Quality selection
-		if (is_numeric(this.quality) && isset(this.media[this.quality]))
-		{
-			key        = this.quality;
-			this.media = this.media[key];
-		}
-		else
-		{
-			this.quality = strtolower(this.quality);
-			switch (this.quality)
-			{
-			case "low":
-				this.quality = 2;
-				break;
-			case "medium":
-				this.quality = 1;
-				break;
-			default:
-				this.quality = 0;
-			}
-			while (this.quality >= 0)
-			{
-			key = KeyName(this.media, this.quality);
-			if (key !== NULL)
-			{
-				this.media = this.media[$key];
-				break;
-			}
-			else
-				this.quality -= 1;
-			}
-		}
-		LogInfo(" Selected : " + key);
 
 		// Parse initial bootstrap info
 		this.baseUrl = this.media["baseUrl"];
