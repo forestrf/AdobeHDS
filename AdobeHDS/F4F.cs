@@ -7,7 +7,7 @@ using System.Diagnostics;
 
 public class F4F : Functions
 {
-	object audio, auth, baseFilename, baseTS, bootstrapUrl, baseUrl, debug, duration, fileCount, filesize, fixWindow;
+	object audio, auth, baseFilename, baseTS, baseUrl, debug, duration, fileCount, filesize, fixWindow;
 	object format, media, metadata, outDir, outFile, parallel, play, processed, quality, rename, video;
 	object prevTagSize, tagHeaderLen;
 	object segTable, fragTable, segNum, fragNum, frags, fragCount, lastFrag, fragUrl, discontinuity;
@@ -19,7 +19,6 @@ public class F4F : Functions
 	{
 		this.auth = "";
 		this.baseFilename = "";
-		this.bootstrapUrl = "";
 		this.debug = false;
 		this.duration = 0;
 		this.fileCount = 1;
@@ -110,7 +109,6 @@ public class F4F : Functions
 
 		foreach (XmlNode node in nodes) {
 
-			// Media can be a child manifest, a fragment of the manifest in another file (not implemented)
 			Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
 
 			if (node.Attributes ["bitrate"] != null) {
@@ -128,9 +126,7 @@ public class F4F : Functions
 			if (idx > -1) {
 				manifest_parsed_media.queryString = manifest_parsed_media.url.Substring (idx);
 				manifest_parsed_media.url = manifest_parsed_media.url.Substring (0, idx);
-			}/* else {
-				// manifest_parsed_media.queryString = global auth;
-			}*/
+			}
 
 			XmlElement bootstrapInfoId = node ["bootstrapInfoId"];
 			XmlNode bootstrap;
@@ -142,6 +138,7 @@ public class F4F : Functions
 
 			if (bootstrap.Attributes ["url"] != null) {
 				// download bootstrap
+				LogError ("Invalid bootstrap (url bootstrap)");
 			} else {
 				manifest_parsed_media.bootstrap = Convert.FromBase64String(bootstrap.InnerText);
 			}
@@ -157,9 +154,33 @@ public class F4F : Functions
 		// Manifest parsed.
 		// Select best quality
 
+		if (manifest_parsed_media_list.Count == 0) {
+			LogError ("No media found.");
+			return;
+		}
 
+		Manifest_parsed_media media_target = manifest_parsed_media_list[0];
 
+		foreach (Manifest_parsed_media media in manifest_parsed_media_list) {
+			if (media_target.bitrate < media.bitrate) {
+				media_target = media;
+			}
+			LogInfo ("Bitrate availabe: " + media.bitrate);
+		}
 
+		LogInfo ("Bitrate autoselected: " + media_target.bitrate);
+
+		// Parse bootstrap info
+		int pos = 0;
+		long boxSize = 0;
+		string boxType = "";
+		ReadBoxHeader(media_target.bootstrap, ref pos, ref boxType, ref boxSize);
+		/*if (boxType == "abst") {
+			ParseBootstrapBox (bootstrapInfo, pos);
+		} else {
+			LogError ("Failed to parse bootstrap info");
+			return;
+		}*/
 
 
 		/*

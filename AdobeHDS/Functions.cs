@@ -8,31 +8,30 @@ using System.Diagnostics;
 public class Functions : Defines
 {
 	/*
-	public static byte ReadByte(string str, int pos)
+	public long ReadInt24(byte[] str, int pos)
 	{
-		return Encoding.Default.GetBytes(str, pos, 1);
+		long res = BitConverter.ToInt24 (str, pos);
+		return BitConverter.IsLittleEndian ? SwapInt24 (res) : res;
+	}
+	*/
+
+	public string ReadString(byte[] str, int start, int length)
+	{
+		return BitConverter.ToString (str, start, length);
 	}
 
-	public static object ReadInt24(string str, int pos)
+	public long ReadInt32(byte[] str, int pos)
 	{
-		int32 = unpack('N', "\x00" + str.Substring(pos, 3));
-		return int32[1];
+		long res = BitConverter.ToInt32 (str, pos);
+		return BitConverter.IsLittleEndian ? SwapInt32 (res) : res;
 	}
 
-	public static object ReadInt32(string str, int pos)
+	public long ReadInt64(byte[] str, int pos)
 	{
-		int32 = unpack('N', str.Substring(pos, 4));
-		return int32[1];
+		long res = BitConverter.ToInt64 (str, pos);
+		return BitConverter.IsLittleEndian ? SwapInt64 (res) : res;
 	}
-
-	public static object ReadInt64(string str, int pos)
-	{
-		hi    = sprintf("%u", ReadInt32(str, pos));
-		lo    = sprintf("%u", ReadInt32(str, pos + 4));
-		int64 = bcadd(bcmul(hi, "4294967296"), lo);
-		return int64;
-	}
-
+/*
 	public static object ReadString(string str, int pos)
 	{
 		int len = 0;
@@ -42,16 +41,31 @@ public class Functions : Defines
 		pos += len + 1;
 		return str;
 	}
+*/
 
-	public static void ReadBoxHeader(string str, ref int pos, ref string boxType, ref int boxSize)
+	public short SwapInt16(short v){
+		return (short)(((v & 0xff) << 8) | ((v >> 8) & 0xff));
+	}
+
+	public int SwapInt32(long v){
+		return (((SwapInt16((short)v) & 0xffff) << 0x10) | 
+			(SwapInt16((short)(v >> 0x10)) & 0xffff));
+	}
+	
+	public long SwapInt64(long v){
+		return (long)(((SwapInt32((int)v) & 0xffffffffL) << 0x20) | 
+			(SwapInt32((int)(v >> 0x20)) & 0xffffffffL));
+	}
+
+	public void ReadBoxHeader(byte[] bootstrap, ref int pos, ref string boxType, ref long boxSize)
 	{
-		if (pos == null)
-			pos = 0;
-		boxSize = ReadInt32(str, pos);
-		boxType = str.Substring(pos + 4, 4);
+
+		boxSize = ReadInt32(bootstrap, pos);
+	
+		boxType = ReadString (bootstrap, pos + 4, 4);
 		if (boxSize == 1)
 		{
-			boxSize = ReadInt64(str, pos + 8) - 16;
+			boxSize = ReadInt64(bootstrap, pos + 8) - 16;
 			pos += 16;
 		}
 		else
@@ -59,10 +73,11 @@ public class Functions : Defines
 			boxSize -= 8;
 			pos += 8;
 		}
+		
 		if (boxSize <= 0)
 			boxSize = 0;
 	}
-
+/*
 	public static void WriteByte(ref string str, int pos, int int_v)
 	{
 		str[pos] = pack('C', int_v);
