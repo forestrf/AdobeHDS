@@ -14,86 +14,113 @@ public class F4F : Functions
 	object prevAVC_Header, prevAAC_Header, AVC_HeaderWritten, AAC_HeaderWritten;
 	object segStart, fragStart, negTS;
 
-	public F4F()
-		{
-		this.auth          = "";
-		this.baseFilename  = "";
-		this.bootstrapUrl  = "";
-		this.debug         = false;
-		this.duration      = 0;
-		this.fileCount     = 1;
-		this.fixWindow     = 1000;
-		this.format        = "";
-		this.metadata      = true;
-		this.outDir        = "";
-		this.outFile       = "";
-		this.parallel      = 8;
-		this.play          = false;
-		this.processed     = false;
-		this.quality       = "high";
-		this.rename        = false;
-		this.segTable      = new Dictionary<string, object>();
-		this.fragTable     = new Dictionary<string, object>();
-		this.segStart      = false;
-		this.fragStart     = false;
-		this.frags         = new Dictionary<string, object>();
-		this.fragCount     = 0;
-		this.lastFrag      = 0;
+	public F4F ()
+	{
+		this.auth = "";
+		this.baseFilename = "";
+		this.bootstrapUrl = "";
+		this.debug = false;
+		this.duration = 0;
+		this.fileCount = 1;
+		this.fixWindow = 1000;
+		this.format = "";
+		this.metadata = true;
+		this.outDir = "";
+		this.outFile = "";
+		this.parallel = 8;
+		this.play = false;
+		this.processed = false;
+		this.quality = "high";
+		this.rename = false;
+		this.segTable = new Dictionary<string, object> ();
+		this.fragTable = new Dictionary<string, object> ();
+		this.segStart = false;
+		this.fragStart = false;
+		this.frags = new Dictionary<string, object> ();
+		this.fragCount = 0;
+		this.lastFrag = 0;
 		this.discontinuity = "";
-		this.InitDecoder();
+		this.InitDecoder ();
 	}
 
-	public void InitDecoder()
+	public void InitDecoder ()
 	{
-		this.audio             = false;
-		this.filesize          = 0;
-		this.video             = false;
-		this.prevTagSize       = 4;
-		this.tagHeaderLen      = 11;
-		this.baseTS            = INVALID_TIMESTAMP;
-		this.negTS             = INVALID_TIMESTAMP;
-		this.prevAudioTS       = INVALID_TIMESTAMP;
-		this.prevVideoTS       = INVALID_TIMESTAMP;
-		this.pAudioTagLen      = 0;
-		this.pVideoTagLen      = 0;
-		this.pAudioTagPos      = 0;
-		this.pVideoTagPos      = 0;
-		this.prevAVC_Header    = false;
-		this.prevAAC_Header    = false;
+		this.audio = false;
+		this.filesize = 0;
+		this.video = false;
+		this.prevTagSize = 4;
+		this.tagHeaderLen = 11;
+		this.baseTS = INVALID_TIMESTAMP;
+		this.negTS = INVALID_TIMESTAMP;
+		this.prevAudioTS = INVALID_TIMESTAMP;
+		this.prevVideoTS = INVALID_TIMESTAMP;
+		this.pAudioTagLen = 0;
+		this.pVideoTagLen = 0;
+		this.pAudioTagPos = 0;
+		this.pVideoTagPos = 0;
+		this.prevAVC_Header = false;
+		this.prevAAC_Header = false;
 		this.AVC_HeaderWritten = false;
 		this.AAC_HeaderWritten = false;
 	}
 
-	public XmlDocument GetManifest(string manifest)
+	public void ParseManifest (string manifest)
 	{
-		try{
-			string manifest_xml = new WebClient().DownloadString(manifest);
+		XmlDocument doc = new XmlDocument ();
+		try {
+			doc.Load (manifest);
+		} catch (Exception e) {
+			try {
+				doc.LoadXml (manifest);
+			} catch (Exception f) {
+				LogError ("Unable to download the manifest");
+				// END HERE
+				return;
+			}
 		}
-		catch(Exception e){
-			LogError("Unable to download the manifest.");
+
+		Manifest_parsed manifest_parsed = new Manifest_parsed ();
+
+		XmlNodeList nodes = doc.DocumentElement.ChildNodes;
+		//manifest_parsed
+		foreach (XmlNode node in nodes) {
+			switch (node.Name) {
+			case "bootstrapInfo":
+				manifest_parsed.bootstrapInfo.Add (node.Attributes ["id"].InnerText, node.InnerText);
+				break;
+			case "media":
+				Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
+				manifest_parsed_media.metadata = node.InnerText;
+				foreach (XmlAttribute node_media in node.Attributes) {
+					switch (node_media.Name) {
+					case "bootstrapInfoId":
+						manifest_parsed_media.bootstrapInfoId = node_media.InnerText;
+						break;
+					case "width":
+						manifest_parsed_media.width = int.Parse(node_media.InnerText);
+						break;
+					case "height":
+						manifest_parsed_media.height = int.Parse(node_media.InnerText);
+						break;
+					case "bitrate":
+						manifest_parsed_media.bitrate = int.Parse(node_media.InnerText);
+						break;
+					case "url":
+						manifest_parsed_media.url = node_media.InnerText;
+						break;
+					}
+				}
+				manifest_parsed.media.Add (manifest_parsed_media);
+				break;
+			}
 		}
 
-		XmlDocument xml = new XmlDocument();
-		xml.Load(cc.response.Trim());
-		XmlNode root = xml.DocumentElement;
+		manifest_parsed = manifest_parsed;
 
-		// Add the namespace.
-		XmlNamespaceManager nsmgr = new XmlNamespaceManager(xml.NameTable);
-		nsmgr.AddNamespace("ns", "urn:newbooks-schema");
 
-		if (!xml.HasChildNodes)
-			LogError("Failed to load xml");
-		namespace_v = xml.getDocNamespaces();
-		namespace_v = namespace_v[""];
-		xml.registerXPathNamespace("ns", namespace_v);
-		return xml;
-	}
 
-	public static void ParseManifest(cURL cc, string parentManifest)
-	{
-		LogInfo("Processing manifest info....");
-		XmlDocument xml = this.GetManifest(cc, parentManifest);
 
+		/*
 		// Extract baseUrl from manifest url
 		string baseUrl;
 		pre_baseUrl = xml.xpath("/ns:manifest/ns:baseURL");
@@ -653,8 +680,7 @@ public class F4F : Functions
 		$fragPos = 0;
 		$fragLen = strlen($frag);
 
-		/* Some moronic servers add wrong boxSize in header causing fragment verification *
-   * to fail so we have to fix the boxSize before processing the fragment.          */
+		//Some moronic servers add wrong boxSize in header causing fragment verification to fail so we have to fix the boxSize before processing the fragment.          
 		while ($fragPos < $fragLen)
 		{
 			ReadBoxHeader($frag, $fragPos, $boxType, $boxSize);
@@ -1021,5 +1047,48 @@ public class F4F : Functions
 		if (this.frags.Count() == 0)
 			unset(this.frags);
 		return true;
+	*/
+	}
+}
+
+class Manifest_parsed
+{
+	public Dictionary<string, string> bootstrapInfo = new Dictionary<string, string> ();
+	public List<Manifest_parsed_media> media = new List<Manifest_parsed_media> ();
+
+	public Manifest_parsed ()
+	{
+	}
+
+	public Manifest_parsed (Dictionary<string, string> bootstrapInfo, List<Manifest_parsed_media> media)
+	{
+		this.bootstrapInfo = bootstrapInfo;
+		this.media = media;
+	}
+}
+
+class Manifest_parsed_media
+{
+	public string bootstrapInfoId;
+	public int width;
+	public int height;
+	public int bitrate;
+	public string url;
+
+	public string metadata;
+
+	public Manifest_parsed_media ()
+	{
+	}
+
+	public Manifest_parsed_media (string bootstrapInfoId, int width, int height, int bitrate, string url, string metadata)
+	{
+		this.bootstrapInfoId = bootstrapInfoId;
+		this.width = width;
+		this.height = height;
+		this.bitrate = bitrate;
+		this.url = url;
+
+		this.metadata = metadata;
 	}
 }

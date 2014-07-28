@@ -3,9 +3,11 @@ using System.Collections.Generic;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.IO;
+using System.Diagnostics;
 
-public static class Functions : Defines
+public class Functions : Defines
 {
+	/*
 	public static byte ReadByte(string str, int pos)
 	{
 		return Encoding.Default.GetBytes(str, pos, 1);
@@ -141,49 +143,32 @@ public static class Functions : Defines
 		temp = array_slice(a, pos, 1, true);
 		return key(temp);
 	}
-
-	public static void LogDebug(string msg)
+*/
+	public void LogDebug(string msg)
 	{
-		LogDebug(msg, true);
-	}
-	public static void LogDebug(string msg, bool display)
-	{
-		global debug, showHeader;
-		if (showHeader)
+		/*if (showHeader)
 		{
 			ShowHeader();
 			showHeader = false;
-		}
-		if (display && debug)
-			fwrite(STDERR, msg + "\n");
+		}*/
+		Debug.WriteLine("DEBUG: " + msg);
 	}
 
-	public static void LogError(string msg)
-	{
-		LogError(msg, 1);
-	}
-	public static void LogError(string msg, int code)
+	public void LogError(string msg)
 	{
 		LogInfo(msg);
-		exit(code);
 	}
 
-	public static void LogInfo(string msg)
+	public void LogInfo(string msg)
 	{
-		LogInfo(msg, false);
-	}
-	public static void LogInfo(string msg, bool progress = false)
-	{
-		global quiet, showHeader;
-		if (showHeader)
+		/*if (showHeader)
 		{
 			ShowHeader();
 			showHeader = false;
-		}
-		if (!quiet)
-			PrintLine(msg, progress);
+		}*/
+		Console.WriteLine(msg);
 	}
-
+	/*
 	public static string NormalizePath(string path)
 	{
 		string pattern = "(?<!\\/)\\/(?!\\/)";
@@ -349,4 +334,5 @@ public static class Functions : Defines
 
 		return false;
 	}
+	*/
 }

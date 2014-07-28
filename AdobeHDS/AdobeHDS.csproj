@@ -40,7 +40,6 @@
     <Compile Include="Defines.cs" />
     <Compile Include="Functions.cs" />
     <Compile Include="F4F.cs" />
-    <Compile Include="cURL.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
 </Project>
