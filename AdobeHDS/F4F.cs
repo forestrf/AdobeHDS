@@ -112,7 +112,6 @@ public class F4F : Functions
 
 			// Media can be a child manifest, a fragment of the manifest in another file (not implemented)
 			Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
-			manifest_parsed_media.metadata = node ["metadata"].InnerText;
 
 			if (node.Attributes ["bitrate"] != null) {
 				manifest_parsed_media.bitrate = int.Parse (node.Attributes ["bitrate"].InnerText);
@@ -144,18 +143,19 @@ public class F4F : Functions
 			if (bootstrap.Attributes ["url"] != null) {
 				// download bootstrap
 			} else {
-				manifest_parsed_media.bootstrap = Base64Decode(bootstrap.InnerText);
+				manifest_parsed_media.bootstrap = Convert.FromBase64String(bootstrap.InnerText);
 			}
 
-			if (node.Attributes ["metadata"] != null) {
-				manifest_parsed_media.metadata = node ["metadata"].InnerText;
+			// Metadata
+			if (node.FirstChild != null) {
+				manifest_parsed_media.metadata = Convert.FromBase64String(node.FirstChild.InnerText);
 			}
 
 			manifest_parsed_media_list.Add (manifest_parsed_media);
-			
 		}
 
 		// Manifest parsed.
+		// Select best quality
 
 
 
@@ -163,119 +163,6 @@ public class F4F : Functions
 
 
 		/*
-		// Extract baseUrl from manifest url
-		string baseUrl;
-		pre_baseUrl = xml.xpath("/ns:manifest/ns:baseURL");
-		if (isset(baseUrl[0]))
-			baseUrl = GetString(pre_baseUrl[0]);
-		else
-		{
-			baseUrl = parentManifest;
-			if (strpos(baseUrl, "?") != false)
-				baseUrl = baseUrl.Substring(0, baseUrl.IndexOf("?"));
-			baseUrl = baseUrl.Substring(0, baseUrl.LastIndexOf("/"));
-		}
-
-		int count;
-
-		urls = xml.xpath("/ns:manifest/ns:media[@*]");
-		if (isset(urls[0]["href"]))
-		{
-			count = 1;
-			foreach (Dictionary<string, object> childManifest in urls)
-			{
-				if (isset(childManifest["bitrate"]))
-					bitrate = Math.Floor(GetString(childManifest["bitrate"]));
-				else
-					bitrate = count++;
-				Dictionary entry = new Dictionary<string, object>();
-				entry =& childManifests[bitrate];
-				entry["bitrate"] = bitrate;
-				entry["url"]     = AbsoluteUrl(baseUrl, GetString(childManifest["href"]));
-				entry["xml"]     = this.GetManifest(cc, entry["url"] as string);
-			}
-			unset(entry, childManifest);
-		}
-		else
-		{
-			childManifests[0]["bitrate"] = 0;
-			childManifests[0]["url"]     = parentManifest;
-			childManifests[0]["xml"]     = xml;
-		}
-
-		count = 1;
-		foreach (childManifests as childManifest)
-		{
-			xml = childManifest["xml"];
-
-			// Extract baseUrl from manifest url
-			baseUrl = xml.xpath("/ns:manifest/ns:baseURL");
-			if (isset(baseUrl[0]))
-				baseUrl = GetString(baseUrl[0]);
-			else
-			{
-				baseUrl = childManifest["url"];
-				if (baseUrl.IndexOf("?") != -1)
-					baseUrl = baseUrl.Substring(0, baseUrl.IndexOf("?"));
-				baseUrl = substr(baseUrl, 0, strrpos(baseUrl, "/"));
-			}
-
-			streams = xml.xpath("/ns:manifest/ns:media");
-			foreach (streams as stream)
-			{
-				array = array();
-				foreach (KeyValuePair<string, object> kv in stream.attributes())
-					array[kv.Key.ToLower()] = GetString(kv.Value);
-				array["metadata"] = GetString(stream->{'metadata'});
-				stream            = array;
-
-				if (isset(stream["bitrate"]))
-					bitrate = floor($stream["bitrate"]);
-				else if (childManifest["bitrate"] > 0)
-					bitrate = childManifest["bitrate"];
-				else
-					bitrate = count++;
-				while (isset(this.media[bitrate]))
-					bitrate++;
-				$streamId = isset($stream[strtolower('streamId')]) ? $stream[strtolower('streamId')] : "";
-				$mediaEntry =& this.media[$bitrate];
-
-				$mediaEntry["baseUrl"] = $baseUrl;
-				$mediaEntry["url"]     = $stream["url"];
-				if (isRtmpUrl($mediaEntry["baseUrl"]) or isRtmpUrl($mediaEntry["url"]))
-					LogError("Provided manifest is not a valid HDS manifest");
-
-				// Use embedded auth information when available
-				int idx = mediaEntry["url"].IndexOf("?");
-				if (idx != -1)
-				{
-					mediaEntry["queryString"] = substr($mediaEntry["url"], $idx);
-					mediaEntry["url"]         = substr($mediaEntry["url"], 0, $idx);
-					if (strlen(this.auth) != 0 and strcmp(this.auth, $mediaEntry["queryString"]) != 0)
-						LogDebug("Manifest overrides 'auth': " + $mediaEntry["queryString"]);
-				}
-				else
-					mediaEntry["queryString"] = this.auth;
-
-				if (isset($stream[strtolower("bootstrapInfoId")]))
-					$bootstrap = xml.xpath("/ns:manifest/ns:bootstrapInfo[@id='" + $stream[strtolower("bootstrapInfoId")] . "']");
-				else
-					$bootstrap = xml.xpath("/ns:manifest/ns:bootstrapInfo");
-				if (isset($bootstrap[0]["url"]))
-				{
-					$mediaEntry["bootstrapUrl"] = AbsoluteUrl($mediaEntry["baseUrl"], GetString($bootstrap[0]["url"]));
-					if (strpos($mediaEntry["bootstrapUrl"], '?') === false)
-						$mediaEntry["bootstrapUrl"] .= this.auth;
-				}
-				else
-					$mediaEntry["bootstrap"] = base64_decode(GetString($bootstrap[0]));
-				if (isset($stream["metadata"]))
-					$mediaEntry["metadata"] = base64_decode($stream["metadata"]);
-				else
-					$mediaEntry["metadata"] = "";
-			}
-			unset($mediaEntry, $childManifest);
-		}
 
 		// Available qualities
 		$bitrates = array();
@@ -1100,8 +987,8 @@ class Manifest_parsed_media
 	public string baseUrl;
 	public string url;
 	public string queryString;
-	public string bootstrap;
-	public string metadata;
+	public byte[] bootstrap;
+	public byte[] metadata;
 
 	public Manifest_parsed_media ()
 	{
