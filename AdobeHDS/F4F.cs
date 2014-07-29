@@ -255,13 +255,15 @@ public class F4F : Functions
 			return;
 		}
 		bool update = (bbyte & 0x10) >> 4 != 0;
+		List<object> segTable;
+		List<object> fragTable;
 		if (!update)
 		{
-			this.segTable  = array();
-			this.fragTable = array();
+			segTable  = new List<object>();
+			fragTable = new List<object>();
 		}
 
-		int timescale            = ReadInt32(bootstrapInfo, pos + 9);
+		long timescale            = ReadInt32(bootstrapInfo, pos + 9);
 		long currentMediaTime    = ReadInt64(bootstrapInfo, pos + 13);
 		long smpteTimeCodeOffset = ReadInt64(bootstrapInfo, pos + 21);
 		pos += 29;
@@ -277,63 +279,65 @@ public class F4F : Functions
 		string drmData        = ReadString(bootstrapInfo, ref pos);
 		string metadata       = ReadString(bootstrapInfo, ref pos);
 		byte segRunTableCount = bootstrapInfo[pos++];
-		LogDebug(sprintf("%s:", "Segment Tables"));
+		LogDebug("Segment Tables:");
 		for (int i = 0; i < segRunTableCount; i++)
 		{
-			LogDebug(sprintf("\nTable %d:", i + 1));
+			LogDebug("\nTable " + (i + 1) + ":");
 			string boxType;
-			ReadBoxHeader($bootstrapInfo, pos, $boxType, $boxSize);
+			long boxSize;
+			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "asrt")
-				$segTable[i] = this.ParseAsrtBox($bootstrapInfo, pos);
-			pos += $boxSize;
+				segTable[i] = ParseAsrtBox(bootstrapInfo, pos);
+			pos += boxSize;
 		}
-		$fragRunTableCount = ReadByte($bootstrapInfo, $pos++);
-		LogDebug(sprintf("%s:", "Fragment Tables"));
-		for ($i = 0; $i < $fragRunTableCount; $i++)
+		byte fragRunTableCount = bootstrapInfo[pos++];
+		LogDebug("Fragment Tables:");
+		for (int i = 0; i < fragRunTableCount; i++)
 		{
-			LogDebug(sprintf("\nTable %d:", $i + 1));
-			ReadBoxHeader($bootstrapInfo, $pos, $boxType, $boxSize);
-			if ($boxType == "afrt")
-				$fragTable[$i] = this.ParseAfrtBox($bootstrapInfo, $pos);
-			$pos += $boxSize;
+			LogDebug("\nTable " + (i + 1) + ":");
+			string boxType;
+			long boxSize;
+			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
+			if (boxType == "afrt")
+				fragTable[i] = ParseAfrtBox(bootstrapInfo, pos);
+			pos += boxSize;
 		}
-		this.segTable  = array_replace(this.segTable, $segTable[0]);
-		this.fragTable = array_replace(this.fragTable, $fragTable[0]);
-		this.ParseSegAndFragTable();
-		*/
+		segTable  = array_replace(segTable, segTable[0]);
+		fragTable = array_replace(fragTable, fragTable[0]);
+		ParseSegAndFragTable();
 	}
 
-	/*
-	function ParseAsrtBox($asrt, $pos)
+
+	public List<object> ParseAsrtBox(byte[] asrt, int pos)
 	{
-		$segTable          = array();
-		$version           = ReadByte($asrt, $pos);
-		$flags             = ReadInt24($asrt, $pos + 1);
-		$qualityEntryCount = ReadByte($asrt, $pos + 4);
-		$pos += 5;
-		for ($i = 0; $i < $qualityEntryCount; $i++)
-			$qualitySegmentUrlModifiers[$i] = ReadString($asrt, $pos);
-		$segCount = ReadInt32($asrt, $pos);
-		$pos += 4;
-		LogDebug(sprintf(" %-8s%-10s", "Number", "Fragments"));
-		for ($i = 0; $i < $segCount; $i++)
+		List<object> segTable = new List<object> ();
+		byte version           = asrt[pos];
+		long flags             = ReadInt24(asrt, pos + 1);
+		byte qualityEntryCount = asrt[pos + 4];
+		pos += 5;
+		for (int i = 0; i < qualityEntryCount; i++)
+			ReadString(asrt, ref pos);
+		long segCount = ReadInt32(asrt, pos);
+		pos += 4;
+		//LogDebug(sprintf(" %-8s%-10s", "Number", "Fragments"));
+		for (int i = 0; i < segCount; i++)
 		{
-			$firstSegment = ReadInt32($asrt, $pos);
-			$segEntry =& $segTable[$firstSegment];
-			$segEntry["firstSegment"]        = $firstSegment;
-			$segEntry["fragmentsPerSegment"] = ReadInt32($asrt, $pos + 4);
-			if ($segEntry["fragmentsPerSegment"] & 0x80000000)
-				$segEntry["fragmentsPerSegment"] = 0;
-			$pos += 8;
+			long firstSegment = ReadInt32(asrt, pos);
+
+			segTable[firstSegment]["firstSegment"]        = firstSegment;
+			segTable[firstSegment]["fragmentsPerSegment"] = ReadInt32(asrt, pos + 4);
+			if (segTable[firstSegment]["fragmentsPerSegment"] & 0x80000000)
+				segTable[firstSegment]["fragmentsPerSegment"] = 0;
+			pos += 8;
 		}
-		unset($segEntry);
-		foreach ($segTable as $segEntry)
+
+		foreach (segTable as segEntry)
 			LogDebug(sprintf(" %-8s%-10s", $segEntry["firstSegment"], $segEntry["fragmentsPerSegment"]));
 		LogDebug("");
-		return $segTable;
+		return segTable;
 	}
 
-	function ParseAfrtBox($afrt, $pos)
+	public object ParseAfrtBox(byte[] afrt, int pos)
 	{
 		$fragTable         = array();
 		$version           = ReadByte($afrt, $pos);
@@ -364,7 +368,7 @@ public class F4F : Functions
 		LogDebug("");
 		return $fragTable;
 	}
-
+	/*
 	function ParseSegAndFragTable()
 	{
 		$firstSegment  = reset(this.segTable);
