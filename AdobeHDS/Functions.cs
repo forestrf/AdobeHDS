@@ -7,63 +7,70 @@ using System.Diagnostics;
 
 public class Functions : Defines
 {
-	/*
-	public long ReadInt24(byte[] str, int pos)
+	public long ReadInt24 (byte[] bytes, int pos)
 	{
-		long res = BitConverter.ToInt24 (str, pos);
+		long res = (bytes [pos + 0] << 16) + (bytes [pos + 1] << 8) + (bytes [pos + 2]);
 		return BitConverter.IsLittleEndian ? SwapInt24 (res) : res;
 	}
-	*/
 
-	public string ReadString(byte[] str, int start, int length)
+	public string ReadString (byte[] bytes, int start, int length)
 	{
-		return Encoding.UTF8.GetString (str, start, length);
+		return Encoding.UTF8.GetString (bytes, start, length);
 	}
 
-	public string ReadString(byte[] str, int start)
+	public string ReadString (byte[] bytes, ref int start)
 	{
-		return Encoding.UTF8.GetString (str, start);
+		string to_return = "";
+		while (bytes [start] != '\x00') {
+			to_return = Encoding.UTF8.GetString (bytes, start++, 1);
+		}
+		return to_return;
 	}
 
-	public long ReadInt32(byte[] str, int pos)
+	public long ReadInt32 (byte[] bytes, int pos)
 	{
-		long res = BitConverter.ToInt32 (str, pos);
+		long res = BitConverter.ToInt32 (bytes, pos);
 		return BitConverter.IsLittleEndian ? SwapInt32 (res) : res;
 	}
 
-	public long ReadInt64(byte[] str, int pos)
+	public long ReadInt64 (byte[] bytes, int pos)
 	{
-		long res = BitConverter.ToInt64 (str, pos);
+		long res = BitConverter.ToInt64 (bytes, pos);
 		return BitConverter.IsLittleEndian ? SwapInt64 (res) : res;
 	}
 
-	public short SwapInt16(short v){
+	public short SwapInt16 (short v)
+	{
 		return (short)(((v & 0xff) << 8) | ((v >> 8) & 0xff));
 	}
 
-	public int SwapInt32(long v){
-		return (((SwapInt16((short)v) & 0xffff) << 0x10) | 
-			(SwapInt16((short)(v >> 0x10)) & 0xffff));
-	}
-	
-	public long SwapInt64(long v){
-		return (long)(((SwapInt32((int)v) & 0xffffffffL) << 0x20) | 
-			(SwapInt32((int)(v >> 0x20)) & 0xffffffffL));
+	public long SwapInt24 (long v)
+	{
+		return ((v >> 8) & 0xff) | ((v << 16) & 0xff0000);
 	}
 
-	public void ReadBoxHeader(byte[] bootstrap, ref int pos, ref string boxType, ref long boxSize)
+	public int SwapInt32 (long v)
+	{
+		return (((SwapInt16 ((short)v) & 0xffff) << 0x10) |
+		(SwapInt16 ((short)(v >> 0x10)) & 0xffff));
+	}
+
+	public long SwapInt64 (long v)
+	{
+		return (long)(((SwapInt32 ((int)v) & 0xffffffffL) << 0x20) |
+		(SwapInt32 ((int)(v >> 0x20)) & 0xffffffffL));
+	}
+
+	public void ReadBoxHeader (byte[] bootstrap, ref int pos, ref string boxType, ref long boxSize)
 	{
 
-		boxSize = ReadInt32(bootstrap, pos);
+		boxSize = ReadInt32 (bootstrap, pos);
 	
 		boxType = ReadString (bootstrap, pos + 4, 4);
-		if (boxSize == 1)
-		{
-			boxSize = ReadInt64(bootstrap, pos + 8) - 16;
+		if (boxSize == 1) {
+			boxSize = ReadInt64 (bootstrap, pos + 8) - 16;
 			pos += 16;
-		}
-		else
-		{
+		} else {
 			boxSize -= 8;
 			pos += 8;
 		}
@@ -71,7 +78,7 @@ public class Functions : Defines
 		if (boxSize <= 0)
 			boxSize = 0;
 	}
-/*
+	/*
 	public static void WriteByte(ref string str, int pos, int int_v)
 	{
 		str[pos] = pack('C', int_v);
@@ -153,29 +160,29 @@ public class Functions : Defines
 		return key(temp);
 	}
 */
-	public void LogDebug(string msg)
+	public void LogDebug (string msg)
 	{
 		/*if (showHeader)
 		{
 			ShowHeader();
 			showHeader = false;
 		}*/
-		Debug.WriteLine("DEBUG: " + msg);
+		Debug.WriteLine ("DEBUG: " + msg);
 	}
 
-	public void LogError(string msg)
+	public void LogError (string msg)
 	{
-		LogInfo(msg);
+		LogInfo (msg);
 	}
 
-	public void LogInfo(string msg)
+	public void LogInfo (string msg)
 	{
 		/*if (showHeader)
 		{
 			ShowHeader();
 			showHeader = false;
 		}*/
-		Console.WriteLine(msg);
+		Console.WriteLine (msg);
 	}
 
 	/*
