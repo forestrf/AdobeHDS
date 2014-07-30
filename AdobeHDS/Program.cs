@@ -8,7 +8,7 @@ namespace AdobeHDS
 		{
 
 			F4F f4f = new F4F ();
-			f4f.ParseManifest ("https://dl.dropboxusercontent.com/u/1630604/borrame.xml");
+			f4f.DownloadFragments ("https://dl.dropboxusercontent.com/u/1630604/borrame.xml");
 
 
 			Console.Read ();
