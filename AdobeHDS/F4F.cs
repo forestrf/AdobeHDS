@@ -324,7 +324,7 @@ public class F4F : Functions
 		{
 			int firstSegment = ReadInt32(asrt, pos);
 			segTable [firstSegment] = new SegTable_content (firstSegment, ReadInt32(asrt, pos + 4));
-			if (segTable[firstSegment].fragmentsPerSegment & 0x80000000)
+			if ((segTable[firstSegment].fragmentsPerSegment & 0x80000000) != 0)
 				segTable[firstSegment].fragmentsPerSegment = 0;
 			pos += 8;
 		}
@@ -348,11 +348,11 @@ public class F4F : Functions
 		}
 		long fragEntries = ReadInt32(afrt, pos);
 		pos += 4;
-		LogDebug(" %-12s%-16s%-16s%-16s", "Number - Timestamp - Duration - Discontinuity");
+		LogDebug("Number - Timestamp - Duration - Discontinuity");
 		for (int i = 0; i < fragEntries; i++)
 		{
 			int firstFragment = ReadInt32(afrt, pos);
-			fragTable[firstFragment] = new Frag_table_content(firstFragment, ReadInt64(afrt, pos + 4), ReadInt32(afrt, pos + 12), "");
+			fragTable[firstFragment] = new Frag_table_content(firstFragment, ReadInt64(afrt, pos + 4), ReadInt32(afrt, pos + 12), new byte());
 			pos += 16;
 			if (fragTable[firstFragment].fragmentDuration == 0)
 				fragTable[firstFragment].discontinuityIndicator = afrt[pos++];
@@ -972,15 +972,15 @@ public class Manifest_parsed_media
 
 public class Frag_table_content{
 	public int firstFragment;
-	public int firstFragmentTimestamp;
+	public long firstFragmentTimestamp;
 	public int fragmentDuration;
-	public string discontinuityIndicator;
+	public byte discontinuityIndicator;
 
 	public Frag_table_content ()
 	{
 	}
 
-	public Frag_table_content (int firstFragment, int firstFragmentTimestamp, int fragmentDuration, string discontinuityIndicator) {
+	public Frag_table_content (int firstFragment, long firstFragmentTimestamp, int fragmentDuration, byte discontinuityIndicator) {
 		this.firstFragment = firstFragment;
 		this.firstFragmentTimestamp = firstFragmentTimestamp;
 		this.fragmentDuration = fragmentDuration;
