@@ -255,15 +255,15 @@ public class F4F : Functions
 			return;
 		}
 		bool update = (bbyte & 0x10) >> 4 != 0;
-		List<Dictionary<string, object>> segTable;
-		List<Dictionary<string, object>> fragTable;
+		List<List<SegTable_content>> segTable;
+		List<List<Frag_table_content>> fragTable;
 		if (!update)
 		{
-			segTable  = new List<Dictionary<string, object>>();
-			fragTable = new List<Dictionary<string, object>>();
+			segTable  = new List<List<SegTable_content>>();
+			fragTable = new List<List<Frag_table_content>>();
 		}
 
-		long timescale           = ReadInt32(bootstrapInfo, pos + 9);
+		int timescale            = ReadInt32(bootstrapInfo, pos + 9);
 		long currentMediaTime    = ReadInt64(bootstrapInfo, pos + 13);
 		long smpteTimeCodeOffset = ReadInt64(bootstrapInfo, pos + 21);
 		pos += 29;
@@ -288,7 +288,7 @@ public class F4F : Functions
 			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "asrt")
 				segTable[i] = ParseAsrtBox(bootstrapInfo, pos);
-			pos += boxSize;
+			pos += (int)boxSize;
 		}
 		byte fragRunTableCount = bootstrapInfo[pos++];
 		LogDebug("Fragment Tables:");
@@ -300,7 +300,7 @@ public class F4F : Functions
 			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "afrt")
 				fragTable[i] = ParseAfrtBox(bootstrapInfo, pos);
-			pos += boxSize;
+			pos += (int)boxSize;
 		}
 		segTable  = array_replace(segTable, segTable[0]);
 		fragTable = array_replace(fragTable, fragTable[0]);
@@ -312,17 +312,17 @@ public class F4F : Functions
 	{
 		List<SegTable_content> segTable = new List<SegTable_content> ();
 		byte version           = asrt[pos];
-		long flags             = ReadInt24(asrt, pos + 1);
+		int flags             = ReadInt24(asrt, pos + 1);
 		byte qualityEntryCount = asrt[pos + 4];
 		pos += 5;
 		for (int i = 0; i < qualityEntryCount; i++)
 			ReadString(asrt, ref pos);
-		long segCount = ReadInt32(asrt, pos);
+		int segCount = ReadInt32(asrt, pos);
 		pos += 4;
 		LogDebug("Number - Fragments");
 		for (int i = 0; i < segCount; i++)
 		{
-			long firstSegment = ReadInt32(asrt, pos);
+			int firstSegment = ReadInt32(asrt, pos);
 			segTable [firstSegment] = new SegTable_content (firstSegment, ReadInt32(asrt, pos + 4));
 			if (segTable[firstSegment].fragmentsPerSegment & 0x80000000)
 				segTable[firstSegment].fragmentsPerSegment = 0;
@@ -955,7 +955,7 @@ public class F4F : Functions
 	*/
 }
 
-class Manifest_parsed_media
+public class Manifest_parsed_media
 {
 	public int bitrate;
 
@@ -970,17 +970,17 @@ class Manifest_parsed_media
 	}
 }
 
-class Frag_table_content{
-	public long firstFragment;
-	public long firstFragmentTimestamp;
-	public long fragmentDuration;
+public class Frag_table_content{
+	public int firstFragment;
+	public int firstFragmentTimestamp;
+	public int fragmentDuration;
 	public string discontinuityIndicator;
 
 	public Frag_table_content ()
 	{
 	}
 
-	public Frag_table_content (long firstFragment, long firstFragmentTimestamp, long fragmentDuration, string discontinuityIndicator) {
+	public Frag_table_content (int firstFragment, int firstFragmentTimestamp, int fragmentDuration, string discontinuityIndicator) {
 		this.firstFragment = firstFragment;
 		this.firstFragmentTimestamp = firstFragmentTimestamp;
 		this.fragmentDuration = fragmentDuration;
@@ -988,15 +988,15 @@ class Frag_table_content{
 	}
 }
 
-class SegTable_content{
-	public long firstSegment;
-	public long fragmentsPerSegment;
+public class SegTable_content{
+	public int firstSegment;
+	public int fragmentsPerSegment;
 
 	public SegTable_content ()
 	{
 	}
 
-	public SegTable_content (long firstSegment, long fragmentsPerSegment) {
+	public SegTable_content (int firstSegment, int fragmentsPerSegment) {
 		this.firstSegment = firstSegment;
 		this.fragmentsPerSegment = fragmentsPerSegment;
 	}

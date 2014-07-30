@@ -7,9 +7,9 @@ using System.Diagnostics;
 
 public class Functions : Defines
 {
-	public long ReadInt24 (byte[] bytes, int pos)
+	public int ReadInt24 (byte[] bytes, int pos)
 	{
-		long res = (bytes [pos + 0] << 16) + (bytes [pos + 1] << 8) + (bytes [pos + 2]);
+		int res = (bytes [pos + 0] << 16) + (bytes [pos + 1] << 8) + (bytes [pos + 2]);
 		return BitConverter.IsLittleEndian ? SwapInt24 (res) : res;
 	}
 
@@ -27,9 +27,9 @@ public class Functions : Defines
 		return to_return;
 	}
 
-	public long ReadInt32 (byte[] bytes, int pos)
+	public int ReadInt32 (byte[] bytes, int pos)
 	{
-		long res = BitConverter.ToInt32 (bytes, pos);
+		int res = BitConverter.ToInt32 (bytes, pos);
 		return BitConverter.IsLittleEndian ? SwapInt32 (res) : res;
 	}
 
@@ -44,12 +44,12 @@ public class Functions : Defines
 		return (short)(((v & 0xff) << 8) | ((v >> 8) & 0xff));
 	}
 
-	public long SwapInt24 (long v)
+	public int SwapInt24 (int v)
 	{
 		return ((v >> 8) & 0xff) | ((v << 16) & 0xff0000);
 	}
 
-	public int SwapInt32 (long v)
+	public int SwapInt32 (int v)
 	{
 		return (((SwapInt16 ((short)v) & 0xffff) << 0x10) |
 		(SwapInt16 ((short)(v >> 0x10)) & 0xffff));
