@@ -7,37 +7,19 @@ using System.Diagnostics;
 
 public class F4F : Functions
 {
-	object audio, auth, baseFilename, baseTS, baseUrl, debug, duration, fileCount, filesize, fixWindow;
-	object format, media, metadata, outDir, outFile, parallel, play, processed, quality, rename, video;
+	object audio, auth, baseTS, baseUrl, fixWindow;
+	object processed, video;
 	object prevTagSize, tagHeaderLen;
-	object segTable, fragTable, segNum, fragNum, frags, fragCount, lastFrag, fragUrl, discontinuity;
+	object lastFrag, fragUrl, discontinuity;
 	object prevAudioTS, prevVideoTS, pAudioTagLen, pVideoTagLen, pAudioTagPos, pVideoTagPos;
 	object prevAVC_Header, prevAAC_Header, AVC_HeaderWritten, AAC_HeaderWritten;
-	object segStart, fragStart, negTS;
+	object negTS;
 
 	public F4F ()
 	{
 		this.auth = "";
-		this.baseFilename = "";
-		this.debug = false;
-		this.duration = 0;
-		this.fileCount = 1;
 		this.fixWindow = 1000;
-		this.format = "";
-		this.metadata = true;
-		this.outDir = "";
-		this.outFile = "";
-		this.parallel = 8;
-		this.play = false;
 		this.processed = false;
-		this.quality = "high";
-		this.rename = false;
-		this.segTable = new Dictionary<string, object> ();
-		this.fragTable = new Dictionary<string, object> ();
-		this.segStart = false;
-		this.fragStart = false;
-		this.frags = new Dictionary<string, object> ();
-		this.fragCount = 0;
 		this.lastFrag = 0;
 		this.discontinuity = "";
 		this.InitDecoder ();
@@ -46,7 +28,6 @@ public class F4F : Functions
 	public void InitDecoder ()
 	{
 		this.audio = false;
-		this.filesize = 0;
 		this.video = false;
 		this.prevTagSize = 4;
 		this.tagHeaderLen = 11;
@@ -254,14 +235,9 @@ public class F4F : Functions
 			LogError ("Live is not supported.");
 			return;
 		}
-		bool update = (bbyte & 0x10) >> 4 != 0;
-		List<List<SegTable_content>> segTable;
-		List<List<Frag_table_content>> fragTable;
-		if (!update)
-		{
-			segTable  = new List<List<SegTable_content>>();
-			fragTable = new List<List<Frag_table_content>>();
-		}
+		Dictionary<int,SegTable_content> segTable = new Dictionary<int,SegTable_content>();
+		Dictionary<int,Frag_table_content> fragTable = new Dictionary<int,Frag_table_content>();
+
 
 		int timescale            = ReadInt32(bootstrapInfo, pos + 9);
 		long currentMediaTime    = ReadInt64(bootstrapInfo, pos + 13);
@@ -274,7 +250,7 @@ public class F4F : Functions
 		}
 		byte qualityEntryCount = bootstrapInfo[pos++];
 		for (int i = 0; i < qualityEntryCount; i++){
-			ReadString(bootstrapInfo, ref pos);
+			LogDebug(ReadString(bootstrapInfo, ref pos));
 		}
 		string drmData        = ReadString(bootstrapInfo, ref pos);
 		string metadata       = ReadString(bootstrapInfo, ref pos);
@@ -283,11 +259,11 @@ public class F4F : Functions
 		for (int i = 0; i < segRunTableCount; i++)
 		{
 			LogDebug("\nTable " + (i + 1) + ":");
-			string boxType;
-			long boxSize;
+			long boxSize = 0;
+			string boxType = null;
 			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "asrt")
-				segTable[i] = ParseAsrtBox(bootstrapInfo, pos);
+				ParseAsrtBox(segTable, bootstrapInfo, pos);
 			pos += (int)boxSize;
 		}
 		byte fragRunTableCount = bootstrapInfo[pos++];
@@ -295,22 +271,20 @@ public class F4F : Functions
 		for (int i = 0; i < fragRunTableCount; i++)
 		{
 			LogDebug("\nTable " + (i + 1) + ":");
-			string boxType;
-			long boxSize;
+			long boxSize = 0;
+			string boxType = null;
 			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "afrt")
-				fragTable[i] = ParseAfrtBox(bootstrapInfo, pos);
+				ParseAfrtBox(fragTable, bootstrapInfo, pos);
 			pos += (int)boxSize;
 		}
-		segTable  = array_replace(segTable, segTable[0]);
-		fragTable = array_replace(fragTable, fragTable[0]);
-		ParseSegAndFragTable();
+		int fragCount = -1, segStart = -1, fragStart = -1;
+		ParseSegAndFragTable(segTable, fragTable, ref fragCount, ref segStart, ref fragStart);
 	}
 
 
-	public List<SegTable_content> ParseAsrtBox(byte[] asrt, int pos)
+	public Dictionary<int,SegTable_content> ParseAsrtBox(Dictionary<int,SegTable_content> segTable, byte[] asrt, int pos)
 	{
-		List<SegTable_content> segTable = new List<SegTable_content> ();
 		byte version           = asrt[pos];
 		int flags             = ReadInt24(asrt, pos + 1);
 		byte qualityEntryCount = asrt[pos + 4];
@@ -329,15 +303,17 @@ public class F4F : Functions
 			pos += 8;
 		}
 
-		foreach (SegTable_content segEntry in segTable)
-			LogDebug(segEntry.firstSegment +" - "+ segEntry.fragmentsPerSegment);
+		foreach(KeyValuePair<int, SegTable_content> segEntry in segTable)
+		{
+			LogDebug(segEntry.Value.firstSegment +" - "+ segEntry.Value.fragmentsPerSegment);
+		}
+
 		LogDebug("");
 		return segTable;
 	}
 
-	public List<Frag_table_content> ParseAfrtBox(byte[] afrt, int pos)
+	public Dictionary<int,Frag_table_content> ParseAfrtBox(Dictionary<int,Frag_table_content> fragTable, byte[] afrt, int pos)
 	{
-		List<Frag_table_content> fragTable = new List<Frag_table_content> ();
 		byte version           = afrt[pos];
 		long flags             = ReadInt24(afrt, pos + 1);
 		long timescale         = ReadInt32(afrt, pos + 4);
@@ -357,54 +333,45 @@ public class F4F : Functions
 			if (fragTable[firstFragment].fragmentDuration == 0)
 				fragTable[firstFragment].discontinuityIndicator = afrt[pos++];
 		}
-		foreach (Frag_table_content fragEntry in fragTable)
-			LogDebug(fragEntry.firstFragment +" - "+ fragEntry.firstFragmentTimestamp +" - "+ fragEntry.fragmentDuration +" - "+ fragEntry.discontinuityIndicator);
-		LogDebug("");
+		foreach (KeyValuePair<int, Frag_table_content> fragEntry in fragTable) {
+			LogDebug (fragEntry.Value.firstFragment + " - " + fragEntry.Value.firstFragmentTimestamp + " - " + fragEntry.Value.fragmentDuration + " - " + fragEntry.Value.discontinuityIndicator);
+		}
+			LogDebug("");
 		return fragTable;
 	}
-	/*
-	function ParseSegAndFragTable()
-	{
-		$firstSegment  = reset(this.segTable);
-		$lastSegment   = end(this.segTable);
-		$firstFragment = reset(this.fragTable);
-		$lastFragment  = end(this.fragTable);
 
+	public void ParseSegAndFragTable(Dictionary<int,SegTable_content> segTable, Dictionary<int,Frag_table_content> fragTable, ref int fragCount, ref int segStart, ref int fragStart)
+	{
 		// Count total fragments by adding all entries in compactly coded segment table
-		$invalidFragCount = false;
-		$prev             = reset(this.segTable);
-		this.fragCount  = $prev["fragmentsPerSegment"];
-		while ($current = next(this.segTable))
+		bool invalidFragCount = false;
+		fragCount = segTable [0].fragmentsPerSegment;
+		int i = 1;
+		while (i < segTable.Count)
 		{
-			this.fragCount += ($current["firstSegment"] - $prev["firstSegment"] - 1) * $prev["fragmentsPerSegment"];
-			this.fragCount += $current["fragmentsPerSegment"];
-			$prev = $current;
+			fragCount += (segTable[i].firstSegment - segTable[i-1].firstSegment - 1) * segTable[i-1].fragmentsPerSegment;
+			fragCount += segTable[i].fragmentsPerSegment;
+			i++;
 		}
-		if (!(this.fragCount & 0x80000000))
-			this.fragCount += $firstFragment["firstFragment"] - 1;
-		if (this.fragCount & 0x80000000)
-		{
-			this.fragCount  = 0;
-			$invalidFragCount = true;
+		if ((fragCount & 0x80000000) == 0) {
+			fragCount += fragTable [0].firstFragment - 1;
+		} else {
+			fragCount  = 0;
+			invalidFragCount = true;
 		}
-		if (this.fragCount < $lastFragment["firstFragment"])
-			this.fragCount = $lastFragment["firstFragment"];
+		if (fragCount < fragTable [fragTable.Count -1].firstFragment)
+			fragCount = fragTable [fragTable.Count -1].firstFragment;
 
 		// Determine starting segment and fragment
-		if (this.segStart === false)
-		{
-			this.segStart = $firstSegment["firstSegment"];
-			if (this.segStart < 1)
-				this.segStart = 1;
-		}
-		if (this.fragStart === false)
-		{
-			this.fragStart = $firstFragment["firstFragment"] - 1;
-			if (this.fragStart < 0)
-				this.fragStart = 0;
-		}
-	}
+		segStart = segTable [0].firstSegment;
+		if (segStart < 1)
+			segStart = 1;
 
+		fragStart = fragTable [0].firstFragment - 1;
+		if (fragStart < 0)
+			fragStart = 0;
+
+	}
+	/*
 	function GetSegmentFromFragment($fragNum)
 	{
 		$firstSegment  = reset(this.segTable);

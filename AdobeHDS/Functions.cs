@@ -24,6 +24,7 @@ public class Functions : Defines
 		while (bytes [start] != '\x00') {
 			to_return = Encoding.UTF8.GetString (bytes, start++, 1);
 		}
+		start++;
 		return to_return;
 	}
 
