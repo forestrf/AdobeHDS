@@ -7,11 +7,12 @@ using System.Diagnostics;
 
 public class F4F : Functions
 {
-	string baseUrl;
+	string baseUrl, baseFilename;
 	byte[] bootstrapInfo;
 	Manifest_parsed_media media;
 	SegTable_content segTable;
 	Dictionary<int,Frag_table_content> fragTable;
+	int segStart = -1, fragStart = -1, fragCount = -1, parallel = 8;
 
 
 
@@ -273,8 +274,7 @@ public class F4F : Functions
 				ParseAfrtBox(bootstrapInfo, pos);
 			pos += (int)boxSize;
 		}
-		int fragCount = -1, segStart = -1, fragStart = -1;
-		ParseSegAndFragTable(ref fragCount, ref segStart, ref fragStart);
+		ParseSegAndFragTable();
 	}
 
 
@@ -330,7 +330,7 @@ public class F4F : Functions
 			LogDebug("");
 	}
 
-	public void ParseSegAndFragTable(ref int fragCount, ref int segStart, ref int fragStart)
+	public void ParseSegAndFragTable()
 	{
 		// Count total fragments by adding all entries in compactly coded segment table
 		fragCount = segTable.fragmentsPerSegment;
@@ -351,6 +351,7 @@ public class F4F : Functions
 		if (fragStart < 0)
 			fragStart = 0;
 	}
+
 	/*
 	function GetSegmentFromFragment($fragNum)
 	{
@@ -380,7 +381,8 @@ public class F4F : Functions
 		}
 		return $lastSegment["firstSegment"];
 	}
-*/
+	*/
+
 	public void DownloadFragments(string manifest)
 	{
 		int start = 0;
@@ -391,123 +393,137 @@ public class F4F : Functions
 		int fragNum = fragStart;
 
 		lastFrag  = fragNum;
-		firstFragment   = fragTable[1];
-		LogInfo("Fragments Total: "+fragCount+", First: "+firstFragment.firstFragment+", Start: "+(fragNum+1)+", Parallel: "+parallel);
+		LogInfo("Fragments Total: "+fragCount+", First: "+fragTable[1].firstFragment+", Start: "+(fragNum+1)+", Parallel: "+parallel);
 
 		// Extract baseFilename
 		baseFilename = media.url;
-		if (substr(this.baseFilename, -1) == '/')
-			this.baseFilename = substr(this.baseFilename, 0, -1);
-		this.baseFilename = RemoveExtension(this.baseFilename);
-		lastSlash          = strrpos(this.baseFilename, '/');
-		if (lastSlash !== false)
-			this.baseFilename = substr(this.baseFilename, lastSlash + 1);
-		if (strpos(manifest, '?'))
-			this.baseFilename = md5(substr(manifest, 0, strpos(manifest, '?'))) . '_' . this.baseFilename;
+		if (baseFilename.Substring(-1) == "/")
+			baseFilename = baseFilename.Substring(0, -1);
+		baseFilename = RemoveExtension(baseFilename);
+		int lastSlash          = baseFilename.LastIndexOf("/");
+		if (lastSlash != -1)
+			baseFilename = baseFilename.Substring(lastSlash + 1);
+		if (manifest.IndexOf("?") != -1)
+			baseFilename = CalculateMD5Hash(manifest.Substring(0, manifest.IndexOf("?"))) + "_" + baseFilename;
 		else
-			this.baseFilename = md5(manifest) . '_' . this.baseFilename;
-		this.baseFilename .= "Seg" + segNum . "-Frag";
+			baseFilename = CalculateMD5Hash(manifest) + "_" + baseFilename;
+		baseFilename += "Seg" + segNum + "-Frag";
 
-		if (fragNum >= this.fragCount)
+		if (fragNum >= fragCount)
 			LogError("No fragment available for downloading");
 
-		this.fragUrl = AbsoluteUrl(this.baseUrl, this.media["url"]);
-		LogDebug("Base Fragment Url:\n" + this.fragUrl . "\n");
+		string fragUrl = AbsoluteUrl(baseUrl, media.url);
+		LogDebug("Base Fragment Url:\n" + fragUrl + "\n");
 		LogDebug("Downloading Fragments:\n");
 
-		while ((fragNum < this.fragCount) or cc->active)
+		bool w1 = true, w2 = true;
+		int downloads_in_process = 0;
+		int frag_table_i = 1;
+		while ((fragNum < fragCount) && w1)
 		{
-			while ((count(cc->ch) < this.parallel) and (fragNum < this.fragCount))
+			w2 = true;
+			while (downloads_in_process < parallel && fragNum < fragCount && w2)
 			{
-				frag       = array();
+				Dictionary<string, object> frag = new Dictionary<string, object>();
 				fragNum    = fragNum + 1;
 				frag["id"] = fragNum;
-				LogInfo("Downloading fragNum/this.fragCount fragments", true);
-				if (in_array_field(fragNum, "firstFragment", this.fragTable, true))
-					this.discontinuity = value_in_array_field(fragNum, "firstFragment", "discontinuityIndicator", this.fragTable, true);
+				LogInfo("Downloading fragNum/this.fragCount fragments");
+				if (in_array_field (fragNum, fragTable)) {
+					if (value_in_array_field (fragNum, fragTable)) {
+						discontinuity = fragNum;
+					}
+				}
 				else
 				{
-					closest = reset(this.fragTable);
-					closest = closest["firstFragment"];
-					while (current = next(this.fragTable))
+					int closest = fragTable[1].firstFragment;
+					int i = 2;
+					while (i < fragTable.Count)
 					{
-						if (current["firstFragment"] < fragNum)
-							closest = current["firstFragment"];
+						if (fragTable[i].firstFragment < fragNum)
+							closest = fragTable[i].firstFragment;
 						else
 							break;
+						i++;
 					}
-					this.discontinuity = value_in_array_field(closest, "firstFragment", "discontinuityIndicator", this.fragTable, true);
+					discontinuity = value_in_array_field(closest, fragTable);
 				}
-				if (this.discontinuity !== "")
+				if (discontinuity != 0)
 				{
-					LogDebug("Skipping fragment fragNum due to discontinuity, Type: " + this.discontinuity);
+					LogDebug("Skipping fragment fragNum due to discontinuity, Type: " + discontinuity);
 					frag["response"] = false;
-					this.rename     = true;
+					rename = true;
 				}
-				else if (file_exists(this.baseFilename . fragNum))
+				else if (file_exists(baseFilename + fragNum))
 				{
 					LogDebug("Fragment fragNum is already downloaded");
-					frag["response"] = file_get_contents(this.baseFilename . fragNum);
+					frag["response"] = file_get_contents(baseFilename + fragNum);
 				}
-				if (isset(frag["response"]))
+				if (frag.ContainsKey("response"))
 				{
-					if (this.WriteFragment(frag, opt) === STOP_PROCESSING)
-						break 2;
+					if (WriteFragment(frag, opt) == STOP_PROCESSING){
+						w1 = false;
+						break;
+					}
 					else
 						continue;
 				}
 
 				LogDebug("Adding fragment fragNum to download queue");
-				segNum = this.GetSegmentFromFragment(fragNum);
-				cc->addDownload(this.fragUrl . "Seg" + segNum . "-Frag" + fragNum . this.media["queryString"], fragNum);
+				segNum = GetSegmentFromFragment(fragNum);
+				cc->addDownload(fragUrl + "Seg" + segNum + "-Frag" + fragNum + media["queryString"], fragNum);
+			}
+			if (!w1) {
+				break;
 			}
 
 			downloads = cc->checkDownloads();
-			if (downloads !== false)
+			if (downloads != false)
 			{
-				for (i = 0; i < count(downloads); i++)
+				for (int i = 0; i < count(downloads); i++)
 				{
 					frag       = array();
 					download   = downloads[i];
 					frag["id"] = download["id"];
 					if (download["status"] == 200)
 					{
-						if (this.VerifyFragment(download["response"]))
+						if (VerifyFragment(download["response"]))
 						{
-							LogDebug("Fragment " + this.baseFilename . download["id"] . " successfully downloaded");
-							file_put_contents(this.baseFilename . download["id"], download["response"]);
+							LogDebug("Fragment " + baseFilename + download["id"] + " successfully downloaded");
+							file_put_contents(baseFilename . download["id"], download["response"]);
 							frag["response"] = download["response"];
 						}
 						else
 						{
-							LogDebug("Fragment " + download["id"] . " failed to verify");
-							LogDebug("Adding fragment " + download["id"] . " to download queue");
+							LogDebug("Fragment " + download["id"] + " failed to verify");
+							LogDebug("Adding fragment " + download["id"] + " to download queue");
 							cc->addDownload(download["url"], download["id"]);
 						}
 					}
-					else if (download["status"] === false)
+					else if (download["status"] == false)
 					{
-						LogDebug("Fragment " + download["id"] . " failed to download");
-						LogDebug("Adding fragment " + download["id"] . " to download queue");
+						LogDebug("Fragment " + download["id"] + " failed to download");
+						LogDebug("Adding fragment " + download["id"] + " to download queue");
 						cc->addDownload(download["url"], download["id"]);
 					}
 					else if (download["status"] == 403)
 						LogError("Access Denied! Unable to download fragments.");
 					else if (download["status"] == 503)
 					{
-						LogDebug("Fragment " + download["id"] . " seems temporary unavailable");
-						LogDebug("Adding fragment " + download["id"] . " to download queue");
+						LogDebug("Fragment " + download["id"] + " seems temporary unavailable");
+						LogDebug("Adding fragment " + download["id"] + " to download queue");
 						cc->addDownload(download["url"], download["id"]);
 					}
 					else
 					{
-						LogDebug("Fragment " + download["id"] . " doesn't exist, Status: " + download["status"]);
+						LogDebug("Fragment " + download["id"] + " doesn't exist, Status: " + download["status"]);
 						frag["response"] = false;
-						this.rename     = true;
+						rename = true;
 					}
-					if (isset(frag["response"]))
-					if (this.WriteFragment(frag, opt) === STOP_PROCESSING)
-						break 2;
+					if (isset (frag ["response"]))
+					if (WriteFragment (frag, opt) == STOP_PROCESSING) {
+						w2 = false;
+						break;
+					}
 				}
 				unset(downloads, download);
 			}
@@ -515,8 +531,8 @@ public class F4F : Functions
 
 		LogInfo("");
 		LogDebug("\nAll fragments downloaded successfully\n");
-		cc->stopDownloads();
-		this.processed = true;
+		cc.stopDownloads();
+		processed = true;
 	}
 	/*
 	function VerifyFragment(&$frag)
@@ -810,8 +826,8 @@ public class F4F : Functions
 		else
 			return $flvData;
 	}
-
-	function WriteFragment($download, &$opt)
+*/
+	public void WriteFragment($download, &$opt)
 	{
 		this.frags[$download["id"]] = $download;
 
@@ -832,14 +848,14 @@ public class F4F : Functions
 						else if (this.outFile)
 						{
 							if ($opt["filesize"])
-								$outFile = JoinUrl(this.outDir, this.outFile . '-' . this.fileCount++ . ".flv");
+								$outFile = JoinUrl(this.outDir, this.outFile . "-" . this.fileCount++ . ".flv");
 							else
 								$outFile = JoinUrl(this.outDir, this.outFile . ".flv");
 						}
 						else
 						{
 							if ($opt["filesize"])
-								$outFile = JoinUrl(this.outDir, this.baseFilename . '-' . this.fileCount++ . ".flv");
+								$outFile = JoinUrl(this.outDir, this.baseFilename . "-" . this.fileCount++ . ".flv");
 							else
 								$outFile = JoinUrl(this.outDir, this.baseFilename . ".flv");
 						}
@@ -891,7 +907,7 @@ public class F4F : Functions
 		if (this.frags.Count() == 0)
 			unset(this.frags);
 		return true;
-	*/
+	}
 }
 
 public class Manifest_parsed_media

@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.IO;
 using System.Diagnostics;
+using System.Security.Cryptography;
 
 public class Functions : Defines
 {
@@ -82,22 +83,22 @@ public class Functions : Defines
 	/*
 	public static void WriteByte(ref string str, int pos, int int_v)
 	{
-		str[pos] = pack('C', int_v);
+		str[pos] = pack("C", int_v);
 	}
 
 	public static void WriteInt24(ref string str, int pos, int int_v)
 	{
-		str[pos]     = pack('C', (int_v & 0xFF0000) >> 16);
-		str[pos + 1] = pack('C', (int_v & 0xFF00) >> 8);
-		str[pos + 2] = pack('C', int_v & 0xFF);
+		str[pos]     = pack("C", (int_v & 0xFF0000) >> 16);
+		str[pos + 1] = pack("C", (int_v & 0xFF00) >> 8);
+		str[pos + 2] = pack("C", int_v & 0xFF);
 	}
 
 	public static void WriteInt32(ref string str, int pos, int int_v)
 	{
-		str[pos]     = pack('C', (int_v & 0xFF000000) >> 24);
-		str[pos + 1] = pack('C', (int_v & 0xFF0000) >> 16);
-		str[pos + 2] = pack('C', (int_v & 0xFF00) >> 8);
-		str[pos + 3] = pack('C', int_v & 0xFF);
+		str[pos]     = pack("C", (int_v & 0xFF000000) >> 24);
+		str[pos + 1] = pack("C", (int_v & 0xFF0000) >> 16);
+		str[pos + 2] = pack("C", (int_v & 0xFF00) >> 8);
+		str[pos + 3] = pack("C", int_v & 0xFF);
 	}
 
 	public static void WriteBoxSize(ref string str, int pos, string type, int size)
@@ -116,45 +117,45 @@ public class Functions : Defines
 		WriteInt24(frag, fragPos + 4, (packetTS & 0x00FFFFFF));
 		WriteByte(frag, fragPos + 7, (packetTS & 0xFF000000) >> 24);
 	}
-
-	public static string AbsoluteUrl(string baseUrl, string url)
+*/
+	public string AbsoluteUrl(string baseUrl, string url)
 	{
 		if (!isHttpUrl(url))
 			url = JoinUrl(baseUrl, url);
 		return NormalizePath(url);
 	}
-
+	/*
 	public static string GetString(object o)
 	{
 		return o.ToString().Trim();
 	}
-
-	public static bool isHttpUrl(string url)
+*/
+	public bool isHttpUrl(string url)
 	{
-		return (strncasecmp(url, "http", 4) == 0) ? true : false;
+		return url.IndexOf("http") == 0;
 	}
-
+	/*
 	public static bool isRtmpUrl(string url)
 	{
 		return Regex.IsMatch("^rtm(p|pe|pt|pte|ps|pts|fp)://", url, RegexOptions.IgnoreCase);
 	}
-
+*/
 	public static string JoinUrl(string firstUrl, string secondUrl)
 	{
 		if (firstUrl != null && secondUrl != null)
 		{
-			if (firstUrl[firstUrl.Length-1] == "/")
+			if (firstUrl[firstUrl.Length-1] == '/')
 				firstUrl = firstUrl.Substring(0, -1);
 			if (secondUrl[0] == '/')
 				secondUrl = secondUrl.Substring(1);
-			return firstUrl + '/' + secondUrl;
+			return firstUrl + "/" + secondUrl;
 		}
 		else if (firstUrl != null)
 			return firstUrl;
 		else
 			return secondUrl;
 	}
-
+	/*
 	public static object KeyName(List a, int pos)
 	{
 		temp = array_slice(a, pos, 1, true);
@@ -163,11 +164,6 @@ public class Functions : Defines
 */
 	public void LogDebug (string msg)
 	{
-		/*if (showHeader)
-		{
-			ShowHeader();
-			showHeader = false;
-		}*/
 		Debug.WriteLine ("DEBUG: " + msg);
 	}
 
@@ -178,16 +174,10 @@ public class Functions : Defines
 
 	public void LogInfo (string msg)
 	{
-		/*if (showHeader)
-		{
-			ShowHeader();
-			showHeader = false;
-		}*/
 		Console.WriteLine (msg);
 	}
 
-	/*
-	public static string NormalizePath(string path)
+	public string NormalizePath(string path)
 	{
 		string pattern = "(?<!\\/)\\/(?!\\/)";
 		string[] inSegs = Regex.Split(path, pattern);
@@ -201,17 +191,17 @@ public class Functions : Defines
 			if (seg == "..")
 				outSegs.RemoveAt (outSegs.Count - 1);
 			else
-				outSegs.Add (outSegs);
+				outSegs.Add (seg);
 		}
 		string outPath = string.Join ("/", outSegs);
 
-		if (path[0] == "/")
+		if (path[0] == '/')
 			outPath = "/" + outPath;
-		if (path[path.Length -1] == "/")
+		if (path[path.Length -1] == '/')
 			outPath += "/";
 		return outPath;
 	}
-
+	/*
 	public static void PrintLine(string msg)
 	{
 		PrintLine(msg, false)
@@ -229,8 +219,24 @@ public class Functions : Defines
 		else
 			Console.WriteLine("\n");
 	}
+*/
+	public string CalculateMD5Hash(string input)
+	{
+		// step 1, calculate MD5 hash from input
+		MD5 md5 = System.Security.Cryptography.MD5.Create();
+		byte[] inputBytes = System.Text.Encoding.ASCII.GetBytes(input);
+		byte[] hash = md5.ComputeHash(inputBytes);
 
-	public static string RemoveExtension(string outFile)
+		// step 2, convert byte array to hex string
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < hash.Length; i++)
+		{
+			sb.Append(hash[i].ToString("X2"));
+		}
+		return sb.ToString();
+	}
+
+	public string RemoveExtension(string outFile)
 	{
 		string pattern = "\\.\\w{1,4}$";
 		string[] extension = Regex.Split(outFile, pattern, RegexOptions.IgnoreCase);
@@ -242,7 +248,7 @@ public class Functions : Defines
 		}
 		return outFile;
 	}
-
+	/*
 	public static void RenameFragments(string baseFilename, int fragNum, string fileExt)
 	{
 		List<string>files = new List<string>();
@@ -332,25 +338,21 @@ public class Functions : Defines
 	}
 
 
-
-	public static bool in_array_field(object needle, string needle_field, Dictionary<string, Dictionary<string, object>> haystack)
+*/
+	public bool in_array_field(int needle, Dictionary<int, Frag_table_content> haystack)
 	{
-		foreach (KeyValuePair<string, Dictionary<string, object>> item in haystack)
-			if (item.Value.ContainsKey(needle_field) && item.Value[needle_field] == needle)
+		foreach (KeyValuePair<int, Frag_table_content> item in haystack)
+			if (item.Value.firstFragment == needle)
 				return true;
 
 		return false;
 	}
 
-
-
-	public static object value_in_array_field(object needle, string needle_field, string value_field, Dictionary<string, Dictionary<string, object>> haystack)
+	public bool value_in_array_field(int needle, Dictionary<int, Frag_table_content> haystack)
 	{
-		foreach (KeyValuePair<string, Dictionary<string, object>> item in haystack)
-			if (item.Value.ContainsKey(needle_field) && item.Value[needle_field] == needle)
-				return item.Value[value_field];
-
+		foreach (KeyValuePair<int, Frag_table_content> item in haystack)
+			if (item.Value.discontinuityIndicator == needle)
+				return true;
 		return false;
 	}
-	*/
 }
