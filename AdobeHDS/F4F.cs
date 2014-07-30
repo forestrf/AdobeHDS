@@ -308,9 +308,9 @@ public class F4F : Functions
 	}
 
 
-	public List<object> ParseAsrtBox(byte[] asrt, int pos)
+	public List<SegTable_content> ParseAsrtBox(byte[] asrt, int pos)
 	{
-		List<Dictionary<string, object>> segTable = new List<Dictionary<string, object>> ();
+		List<SegTable_content> segTable = new List<SegTable_content> ();
 		byte version           = asrt[pos];
 		long flags             = ReadInt24(asrt, pos + 1);
 		byte qualityEntryCount = asrt[pos + 4];
@@ -319,27 +319,25 @@ public class F4F : Functions
 			ReadString(asrt, ref pos);
 		long segCount = ReadInt32(asrt, pos);
 		pos += 4;
-		//LogDebug(sprintf(" %-8s%-10s", "Number", "Fragments"));
+		LogDebug("Number - Fragments");
 		for (int i = 0; i < segCount; i++)
 		{
 			long firstSegment = ReadInt32(asrt, pos);
-
-			segTable[firstSegment]["firstSegment"]        = firstSegment;
-			segTable[firstSegment]["fragmentsPerSegment"] = ReadInt32(asrt, pos + 4);
-			if (segTable[firstSegment]["fragmentsPerSegment"] & 0x80000000)
-				segTable[firstSegment]["fragmentsPerSegment"] = 0;
+			segTable [firstSegment] = new SegTable_content (firstSegment, ReadInt32(asrt, pos + 4));
+			if (segTable[firstSegment].fragmentsPerSegment & 0x80000000)
+				segTable[firstSegment].fragmentsPerSegment = 0;
 			pos += 8;
 		}
 
-		foreach (Dictionary<string, object> segEntry in segTable)
-			LogDebug(sprintf(" %-8s%-10s", segEntry["firstSegment"], segEntry["fragmentsPerSegment"]));
+		foreach (SegTable_content segEntry in segTable)
+			LogDebug(segEntry.firstSegment +" - "+ segEntry.fragmentsPerSegment);
 		LogDebug("");
 		return segTable;
 	}
 
-	public object ParseAfrtBox(byte[] afrt, int pos)
+	public List<Frag_table_content> ParseAfrtBox(byte[] afrt, int pos)
 	{
-		List<Dictionary<string, object>> fragTable = new List<Dictionary<string, object>> ();
+		List<Frag_table_content> fragTable = new List<Frag_table_content> ();
 		byte version           = afrt[pos];
 		long flags             = ReadInt24(afrt, pos + 1);
 		long timescale         = ReadInt32(afrt, pos + 4);
@@ -350,20 +348,17 @@ public class F4F : Functions
 		}
 		long fragEntries = ReadInt32(afrt, pos);
 		pos += 4;
-		LogDebug(sprintf(" %-12s%-16s%-16s%-16s", "Number", "Timestamp", "Duration", "Discontinuity"));
+		LogDebug(" %-12s%-16s%-16s%-16s", "Number - Timestamp - Duration - Discontinuity");
 		for (int i = 0; i < fragEntries; i++)
 		{
-			long firstFragment = ReadInt32(afrt, pos);
-			fragTable[firstFragment]["firstFragment"]          = firstFragment;
-			fragTable[firstFragment]["firstFragmentTimestamp"] = ReadInt64(afrt, pos + 4);
-			fragTable[firstFragment]["fragmentDuration"]       = ReadInt32(afrt, pos + 12);
-			fragTable[firstFragment]["discontinuityIndicator"] = "";
+			int firstFragment = ReadInt32(afrt, pos);
+			fragTable[firstFragment] = new Frag_table_content(firstFragment, ReadInt64(afrt, pos + 4), ReadInt32(afrt, pos + 12), "");
 			pos += 16;
-			if (fragTable[firstFragment]["fragmentDuration"] == 0)
-				fragTable[firstFragment]["discontinuityIndicator"] = afrt[pos++];
+			if (fragTable[firstFragment].fragmentDuration == 0)
+				fragTable[firstFragment].discontinuityIndicator = afrt[pos++];
 		}
-		foreach (Dictionary<string, object> fragEntry in fragTable)
-			LogDebug(sprintf(" %-12s%-16s%-16s%-16s", fragEntry["firstFragment"], fragEntry["firstFragmentTimestamp"], fragEntry["fragmentDuration"], fragEntry["discontinuityIndicator"]));
+		foreach (Frag_table_content fragEntry in fragTable)
+			LogDebug(fragEntry.firstFragment +" - "+ fragEntry.firstFragmentTimestamp +" - "+ fragEntry.fragmentDuration +" - "+ fragEntry.discontinuityIndicator);
 		LogDebug("");
 		return fragTable;
 	}
@@ -972,5 +967,37 @@ class Manifest_parsed_media
 
 	public Manifest_parsed_media ()
 	{
+	}
+}
+
+class Frag_table_content{
+	public long firstFragment;
+	public long firstFragmentTimestamp;
+	public long fragmentDuration;
+	public string discontinuityIndicator;
+
+	public Frag_table_content ()
+	{
+	}
+
+	public Frag_table_content (long firstFragment, long firstFragmentTimestamp, long fragmentDuration, string discontinuityIndicator) {
+		this.firstFragment = firstFragment;
+		this.firstFragmentTimestamp = firstFragmentTimestamp;
+		this.fragmentDuration = fragmentDuration;
+		this.discontinuityIndicator = discontinuityIndicator;
+	}
+}
+
+class SegTable_content{
+	public long firstSegment;
+	public long fragmentsPerSegment;
+
+	public SegTable_content ()
+	{
+	}
+
+	public SegTable_content (long firstSegment, long fragmentsPerSegment) {
+		this.firstSegment = firstSegment;
+		this.fragmentsPerSegment = fragmentsPerSegment;
 	}
 }
