@@ -255,15 +255,15 @@ public class F4F : Functions
 			return;
 		}
 		bool update = (bbyte & 0x10) >> 4 != 0;
-		List<object> segTable;
-		List<object> fragTable;
+		List<Dictionary<string, object>> segTable;
+		List<Dictionary<string, object>> fragTable;
 		if (!update)
 		{
-			segTable  = new List<object>();
-			fragTable = new List<object>();
+			segTable  = new List<Dictionary<string, object>>();
+			fragTable = new List<Dictionary<string, object>>();
 		}
 
-		long timescale            = ReadInt32(bootstrapInfo, pos + 9);
+		long timescale           = ReadInt32(bootstrapInfo, pos + 9);
 		long currentMediaTime    = ReadInt64(bootstrapInfo, pos + 13);
 		long smpteTimeCodeOffset = ReadInt64(bootstrapInfo, pos + 21);
 		pos += 29;
@@ -310,7 +310,7 @@ public class F4F : Functions
 
 	public List<object> ParseAsrtBox(byte[] asrt, int pos)
 	{
-		List<object> segTable = new List<object> ();
+		List<Dictionary<string, object>> segTable = new List<Dictionary<string, object>> ();
 		byte version           = asrt[pos];
 		long flags             = ReadInt24(asrt, pos + 1);
 		byte qualityEntryCount = asrt[pos + 4];
@@ -331,42 +331,41 @@ public class F4F : Functions
 			pos += 8;
 		}
 
-		foreach (segTable as segEntry)
-			LogDebug(sprintf(" %-8s%-10s", $segEntry["firstSegment"], $segEntry["fragmentsPerSegment"]));
+		foreach (Dictionary<string, object> segEntry in segTable)
+			LogDebug(sprintf(" %-8s%-10s", segEntry["firstSegment"], segEntry["fragmentsPerSegment"]));
 		LogDebug("");
 		return segTable;
 	}
 
 	public object ParseAfrtBox(byte[] afrt, int pos)
 	{
-		$fragTable         = array();
-		$version           = ReadByte($afrt, $pos);
-		$flags             = ReadInt24($afrt, $pos + 1);
-		$timescale         = ReadInt32($afrt, $pos + 4);
-		$qualityEntryCount = ReadByte($afrt, $pos + 8);
-		$pos += 9;
-		for ($i = 0; $i < $qualityEntryCount; $i++)
-			$qualitySegmentUrlModifiers[$i] = ReadString($afrt, $pos);
-		$fragEntries = ReadInt32($afrt, $pos);
-		$pos += 4;
-		LogDebug(sprintf(" %-12s%-16s%-16s%-16s", "Number", "Timestamp", "Duration", "Discontinuity"));
-		for ($i = 0; $i < $fragEntries; $i++)
-		{
-			$firstFragment = ReadInt32($afrt, $pos);
-			$fragEntry =& $fragTable[$firstFragment];
-			$fragEntry["firstFragment"]          = $firstFragment;
-			$fragEntry["firstFragmentTimestamp"] = ReadInt64($afrt, $pos + 4);
-			$fragEntry["fragmentDuration"]       = ReadInt32($afrt, $pos + 12);
-			$fragEntry["discontinuityIndicator"] = "";
-			$pos += 16;
-			if ($fragEntry["fragmentDuration"] == 0)
-				$fragEntry["discontinuityIndicator"] = ReadByte($afrt, $pos++);
+		List<Dictionary<string, object>> fragTable = new List<Dictionary<string, object>> ();
+		byte version           = afrt[pos];
+		long flags             = ReadInt24(afrt, pos + 1);
+		long timescale         = ReadInt32(afrt, pos + 4);
+		byte qualityEntryCount = afrt[pos + 8];
+		pos += 9;
+		for (int i = 0; i < qualityEntryCount; i++) {
+			ReadString (afrt, ref pos);
 		}
-		unset($fragEntry);
-		foreach ($fragTable as $fragEntry)
-			LogDebug(sprintf(" %-12s%-16s%-16s%-16s", $fragEntry["firstFragment"], $fragEntry["firstFragmentTimestamp"], $fragEntry["fragmentDuration"], $fragEntry["discontinuityIndicator"]));
+		long fragEntries = ReadInt32(afrt, pos);
+		pos += 4;
+		LogDebug(sprintf(" %-12s%-16s%-16s%-16s", "Number", "Timestamp", "Duration", "Discontinuity"));
+		for (int i = 0; i < fragEntries; i++)
+		{
+			long firstFragment = ReadInt32(afrt, pos);
+			fragTable[firstFragment]["firstFragment"]          = firstFragment;
+			fragTable[firstFragment]["firstFragmentTimestamp"] = ReadInt64(afrt, pos + 4);
+			fragTable[firstFragment]["fragmentDuration"]       = ReadInt32(afrt, pos + 12);
+			fragTable[firstFragment]["discontinuityIndicator"] = "";
+			pos += 16;
+			if (fragTable[firstFragment]["fragmentDuration"] == 0)
+				fragTable[firstFragment]["discontinuityIndicator"] = afrt[pos++];
+		}
+		foreach (Dictionary<string, object> fragEntry in fragTable)
+			LogDebug(sprintf(" %-12s%-16s%-16s%-16s", fragEntry["firstFragment"], fragEntry["firstFragmentTimestamp"], fragEntry["fragmentDuration"], fragEntry["discontinuityIndicator"]));
 		LogDebug("");
-		return $fragTable;
+		return fragTable;
 	}
 	/*
 	function ParseSegAndFragTable()
