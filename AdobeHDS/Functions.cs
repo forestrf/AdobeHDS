@@ -276,58 +276,37 @@ public class Functions : Defines
 		string format = "\n%" + width + "s\n\n";
 		Console.WriteLine(format, header);
 	}
+*/
+	public FileStream WriteFlvFile(string outFile, bool audio, bool video)
+	{
 
-	public object WriteFlvFile(string outFile)
-	{
-		return WriteFlvFile(outFile, true)
-	}
-	public object WriteFlvFile(string outFile, bool audio)
-	{
-		return WriteFlvFile(outFile, audio, true)
-	}
-	public object WriteFlvFile(string outFile, bool audio, bool video)
-	{
-		string flvHeader = pack("H*", "464c5601050000000900000000");
-		int flvHeaderLen = flvHeader.Length;
+		byte[] flvHeader = new byte[]{ 0x46, 0x4c, 0x56, 0x01, 0x05, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00 };
 
 		// Set proper Audio/Video marker
-		WriteByte(flvHeader, 4, audio << 2 | video);
+		flvHeader[4] = (byte)((audio?1:0) << 2 | (video?1:0));
 
-		if (is_resource(outFile))
-			flv = outFile;
-		else
-			flv = fopen(outFile, "w+b");
-		if (!flv)
-			LogError("Failed to open " + outFile);
-		fwrite(flv, flvHeader, flvHeaderLen);
-		return flv;
+		FileStream file = File.Create (outFile);
+
+		file.Write (flvHeader, 0, flvHeader.Length);
+		return file;
 	}
 
-	public object WriteMetadata(F4F f4f, string flv)
+	public void WriteMetadata(F4F f4f, FileStream flv)
 	{
-		if (f4f.media.Length > 0 && f4f.media["metadata"])
+		if (f4f.media.metadata.Length != 0)
 		{
-			int metadataSize = f4f.media["metadata"].Length;
-			WriteByte(metadata, 0, Defines.SCRIPT_DATA);
-			WriteInt24(metadata, 1, metadataSize);
-			WriteInt24(metadata, 4, 0);
-			WriteInt32(metadata, 7, 0);
-			string metadata = implode("", metadata) + f4f.media["metadata"];
-			WriteByte(metadata, f4f.tagHeaderLen + metadataSize - 1, 0x09);
-			WriteInt32(metadata, f4f.tagHeaderLen + metadataSize, f4f.tagHeaderLen + metadataSize);
-			if (is_resource(flv))
-			{
-				fwrite(flv, metadata, f4f.tagHeaderLen + metadataSize + f4f.prevTagSize);
-				return true;
-			}
-			else
-				return metadata;
+			int metadataSize = f4f.media.metadata.Length;
+			f4f.media.metadata[0] = Defines.SCRIPT_DATA;
+			WriteToByteArray (f4f.media.metadata, 1, BitConverter.GetBytes (metadataSize));
+			WriteToByteArray (f4f.media.metadata, 4, BitConverter.GetBytes (0));
+			WriteToByteArray (f4f.media.metadata, 7, BitConverter.GetBytes (0));
+
+			f4f.media.metadata[f4f.tagHeaderLen + metadataSize - 1] = 0x09;
+			WriteToByteArray (f4f.media.metadata, f4f.tagHeaderLen + metadataSize, BitConverter.GetBytes (f4f.tagHeaderLen + metadataSize));
+			flv.Write(f4f.media.metadata, f4f.tagHeaderLen + metadataSize + f4f.prevTagSize, f4f.media.metadata.Length);
 		}
-		return false;
 	}
 
-
-*/
 	public bool in_array_field(int needle, Dictionary<int, Frag_table_content> haystack)
 	{
 		foreach (KeyValuePair<int, Frag_table_content> item in haystack)
