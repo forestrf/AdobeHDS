@@ -355,4 +355,14 @@ public class Functions : Defines
 				return true;
 		return false;
 	}
+
+	public byte[] file_get_contents (string path){
+		byte[] b = new byte[0];
+		using (FileStream fs = File.OpenRead(path)) 
+		{
+			b = new byte[fs.Length];
+			fs.Read (b, 0, b.Length);
+		}
+		return b;
+	}
 }

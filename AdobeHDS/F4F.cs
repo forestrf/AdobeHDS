@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Xml;
 using System.Net;
 using System.Diagnostics;
+using System.IO;
 
 
 public class F4F : Functions
@@ -14,7 +15,17 @@ public class F4F : Functions
 	Dictionary<int,Frag_table_content> fragTable;
 	int segStart = -1, fragStart = -1, fragCount = -1, parallel = 8;
 
-	Dictionary<string, object> frags;
+	Dictionary<int, Frag_response> frags;
+
+	Dictionary<string, object> opt;
+
+	string outFileGlobal = "";
+
+	string outDir = "";
+
+	int lastFrag = 0;
+
+	bool processed = false;
 
 
 
@@ -24,11 +35,11 @@ public class F4F : Functions
 
 
 
-	int discontinuity;
+
+	int discontinuity = 0;
 	object audio, auth, baseTS, fixWindow;
-	object processed, video;
+	object video;
 	object prevTagSize, tagHeaderLen;
-	object lastFrag;
 	object prevAudioTS, prevVideoTS, pAudioTagLen, pVideoTagLen, pAudioTagPos, pVideoTagPos;
 	object prevAVC_Header, prevAAC_Header, AVC_HeaderWritten, AAC_HeaderWritten;
 	object negTS;
@@ -37,9 +48,6 @@ public class F4F : Functions
 	{
 		this.auth = "";
 		this.fixWindow = 1000;
-		this.processed = false;
-		this.lastFrag = 0;
-		this.discontinuity = 0;
 		this.InitDecoder ();
 	}
 
@@ -225,117 +233,113 @@ public class F4F : Functions
 	}
 	*/
 
-	public void ParseBootstrapBox(byte[] bootstrapInfo, int pos){
-		byte version          = bootstrapInfo [pos];
-		long flags            = ReadInt24(bootstrapInfo, pos + 1);
-		long bootstrapVersion = ReadInt32(bootstrapInfo, pos + 4);
-		byte bbyte            = bootstrapInfo[pos + 8];
-		int profile          = (bbyte & 0xC0) >> 6;
-		if ((bbyte & 0x20) >> 5 != 0)
-		{
+	public void ParseBootstrapBox (byte[] bootstrapInfo, int pos)
+	{
+		byte version = bootstrapInfo [pos];
+		long flags = ReadInt24 (bootstrapInfo, pos + 1);
+		long bootstrapVersion = ReadInt32 (bootstrapInfo, pos + 4);
+		byte bbyte = bootstrapInfo [pos + 8];
+		int profile = (bbyte & 0xC0) >> 6;
+		if ((bbyte & 0x20) >> 5 != 0) {
 			LogError ("Live is not supported.");
 			return;
 		}
-		segTable = new SegTable_content();
-		fragTable = new Dictionary<int,Frag_table_content>();
+		segTable = new SegTable_content ();
+		fragTable = new Dictionary<int,Frag_table_content> ();
 
 
-		int timescale            = ReadInt32(bootstrapInfo, pos + 9);
-		long currentMediaTime    = ReadInt64(bootstrapInfo, pos + 13);
-		long smpteTimeCodeOffset = ReadInt64(bootstrapInfo, pos + 21);
+		int timescale = ReadInt32 (bootstrapInfo, pos + 9);
+		long currentMediaTime = ReadInt64 (bootstrapInfo, pos + 13);
+		long smpteTimeCodeOffset = ReadInt64 (bootstrapInfo, pos + 21);
 		pos += 29;
-		string movieIdentifier  = ReadString(bootstrapInfo, ref pos);
-		byte serverEntryCount = bootstrapInfo[pos++];
-		for (int i = 0; i < serverEntryCount; i++){
-			ReadString(bootstrapInfo, ref pos);
+		string movieIdentifier = ReadString (bootstrapInfo, ref pos);
+		byte serverEntryCount = bootstrapInfo [pos++];
+		for (int i = 0; i < serverEntryCount; i++) {
+			ReadString (bootstrapInfo, ref pos);
 		}
-		byte qualityEntryCount = bootstrapInfo[pos++];
-		for (int i = 0; i < qualityEntryCount; i++){
-			LogDebug(ReadString(bootstrapInfo, ref pos));
+		byte qualityEntryCount = bootstrapInfo [pos++];
+		for (int i = 0; i < qualityEntryCount; i++) {
+			LogDebug (ReadString (bootstrapInfo, ref pos));
 		}
-		string drmData        = ReadString(bootstrapInfo, ref pos);
-		string metadata       = ReadString(bootstrapInfo, ref pos);
-		byte segRunTableCount = bootstrapInfo[pos++];
-		LogDebug("Segment Tables:");
-		for (int i = 0; i < segRunTableCount; i++)
-		{
-			LogDebug("\nTable " + (i + 1) + ":");
+		string drmData = ReadString (bootstrapInfo, ref pos);
+		string metadata = ReadString (bootstrapInfo, ref pos);
+		byte segRunTableCount = bootstrapInfo [pos++];
+		LogDebug ("Segment Tables:");
+		for (int i = 0; i < segRunTableCount; i++) {
+			LogDebug ("\nTable " + (i + 1) + ":");
 			long boxSize = 0;
 			string boxType = null;
-			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
+			ReadBoxHeader (bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "asrt")
-				ParseAsrtBox(segTable, bootstrapInfo, pos);
+				ParseAsrtBox (segTable, bootstrapInfo, pos);
 			pos += (int)boxSize;
 		}
-		byte fragRunTableCount = bootstrapInfo[pos++];
-		LogDebug("Fragment Tables:");
-		for (int i = 0; i < fragRunTableCount; i++)
-		{
-			LogDebug("\nTable " + (i + 1) + ":");
+		byte fragRunTableCount = bootstrapInfo [pos++];
+		LogDebug ("Fragment Tables:");
+		for (int i = 0; i < fragRunTableCount; i++) {
+			LogDebug ("\nTable " + (i + 1) + ":");
 			long boxSize = 0;
 			string boxType = null;
-			ReadBoxHeader(bootstrapInfo, ref pos, ref boxType, ref boxSize);
+			ReadBoxHeader (bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "afrt")
-				ParseAfrtBox(bootstrapInfo, pos);
+				ParseAfrtBox (bootstrapInfo, pos);
 			pos += (int)boxSize;
 		}
-		ParseSegAndFragTable();
+		ParseSegAndFragTable ();
 	}
 
 
-	public void ParseAsrtBox(SegTable_content segTable, byte[] asrt, int pos)
+	public void ParseAsrtBox (SegTable_content segTable, byte[] asrt, int pos)
 	{
-		byte version           = asrt[pos];
-		int flags             = ReadInt24(asrt, pos + 1);
-		byte qualityEntryCount = asrt[pos + 4];
+		byte version = asrt [pos];
+		int flags = ReadInt24 (asrt, pos + 1);
+		byte qualityEntryCount = asrt [pos + 4];
 		pos += 5;
 		for (int i = 0; i < qualityEntryCount; i++)
-			ReadString(asrt, ref pos);
-		int segCount = ReadInt32(asrt, pos);
+			ReadString (asrt, ref pos);
+		int segCount = ReadInt32 (asrt, pos);
 		pos += 4;
-		LogDebug("Number - Fragments");
-		for (int i = 0; i < segCount; i++)
-		{
-			int firstSegment = ReadInt32(asrt, pos);
-			segTable = new SegTable_content (firstSegment, ReadInt32(asrt, pos + 4));
+		LogDebug ("Number - Fragments");
+		for (int i = 0; i < segCount; i++) {
+			int firstSegment = ReadInt32 (asrt, pos);
+			segTable = new SegTable_content (firstSegment, ReadInt32 (asrt, pos + 4));
 			if ((segTable.fragmentsPerSegment & 0x80000000) != 0)
 				segTable.fragmentsPerSegment = 0;
 			pos += 8;
 		}
 
-		LogDebug(segTable.firstSegment +" - "+ segTable.fragmentsPerSegment);
+		LogDebug (segTable.firstSegment + " - " + segTable.fragmentsPerSegment);
 
-		LogDebug("");
+		LogDebug ("");
 	}
 
-	public void ParseAfrtBox(byte[] afrt, int pos)
+	public void ParseAfrtBox (byte[] afrt, int pos)
 	{
-		byte version           = afrt[pos];
-		long flags             = ReadInt24(afrt, pos + 1);
-		long timescale         = ReadInt32(afrt, pos + 4);
-		byte qualityEntryCount = afrt[pos + 8];
+		byte version = afrt [pos];
+		long flags = ReadInt24 (afrt, pos + 1);
+		long timescale = ReadInt32 (afrt, pos + 4);
+		byte qualityEntryCount = afrt [pos + 8];
 		pos += 9;
 		for (int i = 0; i < qualityEntryCount; i++) {
 			ReadString (afrt, ref pos);
 		}
-		long fragEntries = ReadInt32(afrt, pos);
+		long fragEntries = ReadInt32 (afrt, pos);
 		pos += 4;
-		LogDebug("Number - Timestamp - Duration - Discontinuity");
-		for (int i = 0; i < fragEntries; i++)
-		{
-			int firstFragment = ReadInt32(afrt, pos);
-			fragTable[firstFragment] = new Frag_table_content(firstFragment, ReadInt64(afrt, pos + 4), ReadInt32(afrt, pos + 12), new byte());
+		LogDebug ("Number - Timestamp - Duration - Discontinuity");
+		for (int i = 0; i < fragEntries; i++) {
+			int firstFragment = ReadInt32 (afrt, pos);
+			fragTable [firstFragment] = new Frag_table_content (firstFragment, ReadInt64 (afrt, pos + 4), ReadInt32 (afrt, pos + 12), new byte ());
 			pos += 16;
-			if (fragTable[firstFragment].fragmentDuration == 0)
-				fragTable[firstFragment].discontinuityIndicator = afrt[pos++];
+			if (fragTable [firstFragment].fragmentDuration == 0)
+				fragTable [firstFragment].discontinuityIndicator = afrt [pos++];
 		}
 		foreach (KeyValuePair<int, Frag_table_content> fragEntry in fragTable) {
 			LogDebug (fragEntry.Value.firstFragment + " - " + fragEntry.Value.firstFragmentTimestamp + " - " + fragEntry.Value.fragmentDuration + " - " + fragEntry.Value.discontinuityIndicator);
 		}
-			LogDebug("");
+		LogDebug ("");
 	}
 
-	public void ParseSegAndFragTable()
+	public void ParseSegAndFragTable ()
 	{
 		// Count total fragments by adding all entries in compactly coded segment table
 		fragCount = segTable.fragmentsPerSegment;
@@ -357,186 +361,112 @@ public class F4F : Functions
 			fragStart = 0;
 	}
 
-	/*
-	function GetSegmentFromFragment($fragNum)
-	{
-		$firstSegment  = reset(this.segTable);
-		$lastSegment   = end(this.segTable);
-		$firstFragment = reset(this.fragTable);
-		$lastFragment  = end(this.fragTable);
-
-		if (count(this.segTable) == 1)
-			return $firstSegment["firstSegment"];
-		else
-		{
-			$prev  = $firstSegment["firstSegment"];
-			$start = $firstFragment["firstFragment"];
-			for ($i = $firstSegment["firstSegment"]; $i <= $lastSegment["firstSegment"]; $i++)
-			{
-				if (isset(this.segTable[$i]))
-					$seg = this.segTable[$i];
-				else
-					$seg = $prev;
-				$end = $start + $seg["fragmentsPerSegment"];
-				if (($fragNum >= $start) and ($fragNum < $end))
-					return $i;
-				$prev  = $seg;
-				$start = $end;
-			}
-		}
-		return $lastSegment["firstSegment"];
-	}
-	*/
-
-	public void DownloadFragments(string manifest)
+	public void DownloadFragments (string manifest)
 	{
 		int start = 0;
 
-		ParseManifest(manifest);
+		ParseManifest (manifest);
 
 		int segNum = segStart;
 		int fragNum = fragStart;
 
-		lastFrag  = fragNum;
-		LogInfo("Fragments Total: "+fragCount+", First: "+fragTable[1].firstFragment+", Start: "+(fragNum+1)+", Parallel: "+parallel);
+		lastFrag = fragNum;
+		LogInfo ("Fragments Total: " + fragCount + ", First: " + fragTable [1].firstFragment + ", Start: " + (fragNum + 1) + ", Parallel: " + parallel);
 
 		// Extract baseFilename
 		baseFilename = media.url;
-		if (baseFilename.Substring(-1) == "/")
-			baseFilename = baseFilename.Substring(0, -1);
-		baseFilename = RemoveExtension(baseFilename);
-		int lastSlash          = baseFilename.LastIndexOf("/");
+		if (baseFilename.Substring (-1) == "/")
+			baseFilename = baseFilename.Substring (0, -1);
+		baseFilename = RemoveExtension (baseFilename);
+		int lastSlash = baseFilename.LastIndexOf ("/");
 		if (lastSlash != -1)
-			baseFilename = baseFilename.Substring(lastSlash + 1);
-		if (manifest.IndexOf("?") != -1)
-			baseFilename = CalculateMD5Hash(manifest.Substring(0, manifest.IndexOf("?"))) + "_" + baseFilename;
+			baseFilename = baseFilename.Substring (lastSlash + 1);
+		if (manifest.IndexOf ("?") != -1)
+			baseFilename = CalculateMD5Hash (manifest.Substring (0, manifest.IndexOf ("?"))) + "_" + baseFilename;
 		else
-			baseFilename = CalculateMD5Hash(manifest) + "_" + baseFilename;
+			baseFilename = CalculateMD5Hash (manifest) + "_" + baseFilename;
 		baseFilename += "Seg" + segNum + "-Frag";
 
 		if (fragNum >= fragCount)
-			LogError("No fragment available for downloading");
+			LogError ("No fragment available for downloading");
 
-		string fragUrl = AbsoluteUrl(baseUrl, media.url);
-		LogDebug("Base Fragment Url:\n" + fragUrl + "\n");
-		LogDebug("Downloading Fragments:\n");
+		string fragUrl = AbsoluteUrl (baseUrl, media.url);
+		LogDebug ("Base Fragment Url:\n" + fragUrl + "\n");
+		LogDebug ("Downloading Fragments:\n");
 
 		bool w1 = true, w2 = true;
 		int downloads_in_process = 0;
 		int frag_table_i = 1;
-		while ((fragNum < fragCount) && w1)
-		{
+		while ((fragNum < fragCount) && w1) {
 			w2 = true;
-			while (downloads_in_process < parallel && fragNum < fragCount && w2)
-			{
-				Dictionary<string, object> frag = new Dictionary<string, object>();
-				fragNum    = fragNum + 1;
-				frag["id"] = fragNum;
-				LogInfo("Downloading fragNum/this.fragCount fragments");
-				if (in_array_field (fragNum, fragTable)) {
-					if (value_in_array_field (fragNum, fragTable)) {
-						discontinuity = fragNum;
-					}
+			Frag_response frag = new Frag_response ();
+			fragNum = fragNum++;
+			frag.id = fragNum;
+			LogInfo ("Downloading fragNum/this.fragCount fragments");
+			/*
+			if (in_array_field (fragNum, fragTable)) {
+				if (value_in_array_field (fragNum, fragTable)) {
+					discontinuity = fragNum;
 				}
-				else
-				{
-					int closest = fragTable[1].firstFragment;
-					int i = 2;
-					while (i < fragTable.Count)
-					{
-						if (fragTable[i].firstFragment < fragNum)
-							closest = fragTable[i].firstFragment;
-						else
-							break;
-						i++;
-					}
-					discontinuity = value_in_array_field(closest, fragTable);
-				}
-				if (discontinuity != 0)
-				{
-					LogDebug("Skipping fragment fragNum due to discontinuity, Type: " + discontinuity);
-					frag["response"] = false;
-					rename = true;
-				}
-				else if (file_exists(baseFilename + fragNum))
-				{
-					LogDebug("Fragment fragNum is already downloaded");
-					frag["response"] = file_get_contents(baseFilename + fragNum);
-				}
-				if (frag.ContainsKey("response"))
-				{
-					if (WriteFragment(frag) == STOP_PROCESSING){
-						w1 = false;
-						break;
-					}
-					else
-						continue;
-				}
-
-				LogDebug("Adding fragment fragNum to download queue");
-				segNum = GetSegmentFromFragment(fragNum);
-				cc->addDownload(fragUrl + "Seg" + segNum + "-Frag" + fragNum + media["queryString"], fragNum);
 			}
+			else
+			{
+				int closest = fragTable[1].firstFragment;
+				int i = 2;
+				while (i < fragTable.Count)
+				{
+					if (fragTable[i].firstFragment < fragNum)
+						closest = fragTable[i].firstFragment;
+					else
+						break;
+					i++;
+				}
+				discontinuity = fragTable [closest].discontinuityIndicator;
+			}
+			if (discontinuity != 0)
+			{
+				LogDebug("Skipping fragment fragNum due to discontinuity, Type: " + discontinuity);
+				frag["response"] = false;
+				rename = true;
+			}
+			else */
+			frag.filename = baseFilename + fragNum;
+			if (File.Exists (frag.filename)) {
+				LogDebug ("Fragment fragNum is already downloaded");
+				frag.response = file_get_contents (frag.filename);
+			} else {
+				LogDebug ("Downloading fragment fragNum");
+				segNum = segTable.firstSegment;
+				new WebClient ().DownloadFile (fragUrl + "Seg" + segNum + "-Frag" + fragNum + media.queryString, frag.filename);
+				frag.response = file_get_contents (frag.filename);
+			}
+			if (frag.response.Length != 0) {
+				if (WriteFragment (frag) == STOP_PROCESSING) {
+					break;
+				}
+			}
+
 			if (!w1) {
 				break;
 			}
 
-			Dictionary<string, object> downloads = cc->checkDownloads();
-			if (downloads.Count != 0)
-			{
-				for (int i = 0; i < downloads.Count; i++)
-				{
-					Dictionary<string, object> frag = new Dictionary<string, object>();
-					Dictionary<string, object> download   = downloads[i];
-					frag["id"] = download["id"];
-					if (download["status"] == 200)
-					{
-						if (VerifyFragment(download["response"]))
-						{
-							LogDebug("Fragment " + baseFilename + download["id"] + " successfully downloaded");
-							file_put_contents(baseFilename . download["id"], download["response"]);
-							frag["response"] = download["response"];
-						}
-						else
-						{
-							LogDebug("Fragment " + download["id"] + " failed to verify");
-							LogDebug("Adding fragment " + download["id"] + " to download queue");
-							cc->addDownload(download["url"], download["id"]);
-						}
-					}
-					else if (download["status"] == false)
-					{
-						LogDebug("Fragment " + download["id"] + " failed to download");
-						LogDebug("Adding fragment " + download["id"] + " to download queue");
-						cc->addDownload(download["url"], download["id"]);
-					}
-					else if (download["status"] == 403)
-						LogError("Access Denied! Unable to download fragments.");
-					else if (download["status"] == 503)
-					{
-						LogDebug("Fragment " + download["id"] + " seems temporary unavailable");
-						LogDebug("Adding fragment " + download["id"] + " to download queue");
-						cc->addDownload(download["url"], download["id"]);
-					}
-					else
-					{
-						LogDebug("Fragment " + download["id"] + " doesn't exist, Status: " + download["status"]);
-						frag["response"] = false;
-						rename = true;
-					}
-					if (frag.ContainsKey("response"))
-						if (WriteFragment (frag) == STOP_PROCESSING) {
-							w2 = false;
-							break;
-						}
+			if (VerifyFragment (frag.response)) {
+				LogDebug ("Fragment " + baseFilename + frag.id + " successfully downloaded");
+				file_put_contents (baseFilename + frag.id, frag.response);
+			} else {
+				fragNum--;
+				File.Delete (frag.filename);
+				LogDebug ("Fragment " + frag.id + " failed to verify");
+			}
+			if (frag.response) {
+				if (WriteFragment (frag) == STOP_PROCESSING) {
+					break;
 				}
-				unset(downloads, download);
 			}
 		}
 
-		LogInfo("");
-		LogDebug("\nAll fragments downloaded successfully\n");
-		cc.stopDownloads();
+		LogInfo ("");
+		LogDebug ("\nAll fragments downloaded successfully\n");
 		processed = true;
 	}
 	/*
@@ -833,73 +763,56 @@ public class F4F : Functions
 	}
 */
 
-	public void WriteFragment(Dictionary<string, object> download, &opt)
+	public int WriteFragment (Frag_response download)
 	{
-		frags[download["id"]] = download;
+		frags [download.id] = download;
 
 		int available = frags.Count;
-		for (int i = 0; i < available; i++)
-		{
-			if (frags.ContainsKey(lastFrag + 1))
-			{
-				frag = frags[lastFrag + 1];
-				if (frag["response"] != false)
-				{
-					LogDebug("Writing fragment " + frag["id"] + " to flv file");
-					if (!opt.ContainsKey("file"))
-					{
-						if (outFile)
-						{
-							if (opt["filesize"])
-								outFile = JoinUrl(outDir, outFile + "-" + (fileCount++) + ".flv");
-							else
-								outFile = JoinUrl(this.outDir, this.outFile + ".flv");
+		for (int i = 0; i < available; i++) {
+			if (frags.ContainsKey (lastFrag + 1)) {
+				Frag_response frag = frags [lastFrag + 1];
+				if (frag.response.Length = 0) {
+					LogDebug ("Writing fragment " + frag ["id"] + " to flv file");
+					if (!opt.ContainsKey ("file")) {
+						string outFile = "";
+						if (outFileGlobal != "") {
+							outFile = JoinUrl (outDir, outFile + ".flv");
+						} else {
+							outFile = JoinUrl (outDir, baseFilename + ".flv");
 						}
-						else
-						{
-							if (opt["filesize"])
-								outFile = JoinUrl(this.outDir, this.baseFilename + "-" + (this.fileCount++) + ".flv");
-							else
-								outFile = JoinUrl(this.outDir, this.baseFilename + ".flv");
-						}
-						InitDecoder();
-						DecodeFragment(frag["response"], frag["id"]);
-						opt["file"] = WriteFlvFile(outFile, audio, video);
+						InitDecoder ();
+						DecodeFragment (frag ["response"], frag ["id"]);
+						opt ["file"] = WriteFlvFile (outFile, audio, video);
 						if (metadata)
-							WriteMetadata($this, opt["file"]);
+							WriteMetadata (opt ["file"]);
 
-						InitDecoder();
+						InitDecoder ();
 					}
-					flvData = DecodeFragment(frag["response"], frag["id"]);
-					if (strlen(flvData))
-					{
-						status = fwrite(opt["file"], flvData, strlen(flvData));
+					flvData = DecodeFragment (frag ["response"], frag ["id"]);
+					if (strlen (flvData)) {
+						status = fwrite (opt ["file"], flvData, strlen (flvData));
 						if (!status)
-							LogError("Failed to write flv data");
-						filesize = ftell(opt["file"]) / (1024 * 1024);
+							LogError ("Failed to write flv data");
+						filesize = ftell (opt ["file"]) / (1024 * 1024);
 					}
-					lastFrag = frag["id"];
-				}
-				else
-				{
+					lastFrag = frag ["id"];
+				} else {
 					lastFrag += 1;
-					LogDebug("Skipping failed fragment " + lastFrag);
+					LogDebug ("Skipping failed fragment " + lastFrag);
 				}
-				unset(frags[lastFrag]);
-			}
-			else
+				unset (frags [lastFrag]);
+			} else
 				break;
 
-			if (opt["tDuration"] && ((opt["duration"] + duration) >= opt["tDuration"]))
-			{
-				LogInfo("");
-				LogInfo((opt["duration"] + this.duration) + " seconds of content has been recorded successfully.", true);
+			if (opt ["tDuration"] && ((opt ["duration"] + duration) >= opt ["tDuration"])) {
+				LogInfo ("");
+				LogInfo ((opt ["duration"] + this.duration) + " seconds of content has been recorded successfully.", true);
 				return STOP_PROCESSING;
 			}
 		}
 
 		if (this.frags.Count == 0)
-			unset(this.frags);
+			unset (this.frags);
 		return true;
 	}
 }
@@ -919,7 +832,8 @@ public class Manifest_parsed_media
 	}
 }
 
-public class Frag_table_content{
+public class Frag_table_content
+{
 	public int firstFragment;
 	public long firstFragmentTimestamp;
 	public int fragmentDuration;
@@ -929,7 +843,8 @@ public class Frag_table_content{
 	{
 	}
 
-	public Frag_table_content (int firstFragment, long firstFragmentTimestamp, int fragmentDuration, byte discontinuityIndicator) {
+	public Frag_table_content (int firstFragment, long firstFragmentTimestamp, int fragmentDuration, byte discontinuityIndicator)
+	{
 		this.firstFragment = firstFragment;
 		this.firstFragmentTimestamp = firstFragmentTimestamp;
 		this.fragmentDuration = fragmentDuration;
@@ -937,7 +852,8 @@ public class Frag_table_content{
 	}
 }
 
-public class SegTable_content{
+public class SegTable_content
+{
 	public int firstSegment;
 	public int fragmentsPerSegment;
 
@@ -945,8 +861,20 @@ public class SegTable_content{
 	{
 	}
 
-	public SegTable_content (int firstSegment, int fragmentsPerSegment) {
+	public SegTable_content (int firstSegment, int fragmentsPerSegment)
+	{
 		this.firstSegment = firstSegment;
 		this.fragmentsPerSegment = fragmentsPerSegment;
+	}
+}
+
+public class Frag_response
+{
+	public byte[] response;
+	public int id;
+	public string filename;
+
+	public Frag_response ()
+	{
 	}
 }
