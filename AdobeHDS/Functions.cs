@@ -80,27 +80,7 @@ public class Functions : Defines
 		if (boxSize <= 0)
 			boxSize = 0;
 	}
-	/*
-	public static void WriteByte(ref string str, int pos, int int_v)
-	{
-		str[pos] = pack("C", int_v);
-	}
 
-	public static void WriteInt24(ref string str, int pos, int int_v)
-	{
-		str[pos]     = pack("C", (int_v & 0xFF0000) >> 16);
-		str[pos + 1] = pack("C", (int_v & 0xFF00) >> 8);
-		str[pos + 2] = pack("C", int_v & 0xFF);
-	}
-
-	public static void WriteInt32(ref string str, int pos, int int_v)
-	{
-		str[pos]     = pack("C", (int_v & 0xFF000000) >> 24);
-		str[pos + 1] = pack("C", (int_v & 0xFF0000) >> 16);
-		str[pos + 2] = pack("C", (int_v & 0xFF00) >> 8);
-		str[pos + 3] = pack("C", int_v & 0xFF);
-	}
-*/
 	public void WriteBoxSize(byte[] str, int pos, string type, long size)
 	{
 		if (ReadString (str, pos - 4, 4) == type) {
@@ -114,6 +94,8 @@ public class Functions : Defines
 	}
 
 	public void WriteToByteArray(byte[] str, int pos, byte[] replace){
+		if (BitConverter.IsLittleEndian)
+			Array.Reverse(replace);
 		for (int i = 0; i < replace.Length; i++) {
 			str [i + pos] = replace [i];
 		}

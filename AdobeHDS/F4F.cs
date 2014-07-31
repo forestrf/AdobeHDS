@@ -363,8 +363,6 @@ public class F4F : Functions
 
 	public void DownloadFragments (string manifest)
 	{
-		int start = 0;
-
 		ParseManifest (manifest);
 
 		int segNum = segStart;
@@ -395,14 +393,12 @@ public class F4F : Functions
 		LogDebug ("Downloading Fragments:\n");
 
 		bool w1 = true, w2 = true;
-		int downloads_in_process = 0;
-		int frag_table_i = 1;
 		while ((fragNum < fragCount) && w1) {
 			w2 = true;
 			Frag_response frag = new Frag_response ();
 			fragNum = fragNum++;
 			frag.id = fragNum;
-			LogInfo ("Downloading fragNum/this.fragCount fragments");
+			LogInfo ("Downloading "+fragNum+"/"+fragCount+" fragments");
 			/*
 			if (in_array_field (fragNum, fragTable)) {
 				if (value_in_array_field (fragNum, fragTable)) {
@@ -496,325 +492,303 @@ public class F4F : Functions
 		}
 		return false;
 	}
-	/*
-	function DecodeFragment($frag, $fragNum, $opt = array())
+
+	public object DecodeFragment(byte[] frag, int fragNum)
 	{
-		$debug = this.debug;
-		$flv   = false;
-		extract($opt, EXTR_IF_EXISTS);
+		bool flv   = false;
 
-		$flvData  = "";
-		$fragPos  = 0;
-		$packetTS = 0;
-		$fragLen  = strlen($frag);
+		byte[] flvData = new byte[0];
+		int fragPos  = 0;
+		int packetTS = 0;
+		int fragLen  = frag.Length;
 
-		if (!this.VerifyFragment($frag))
+		if (!VerifyFragment(frag))
 		{
-			LogInfo("Skipping fragment number $fragNum");
+			LogInfo("Skipping fragment number "+fragNum);
 			return false;
 		}
 
-		while ($fragPos < $fragLen)
+		while (fragPos < fragLen)
 		{
-			ReadBoxHeader($frag, $fragPos, $boxType, $boxSize);
-			if ($boxType == "mdat")
+			long boxSize = 0;
+			string boxType = "";
+			int pos = 0;
+			ReadBoxHeader(frag, ref fragPos, ref boxType, ref boxSize);
+			if (boxType == "mdat")
 			{
-				$fragLen = $fragPos + $boxSize;
+				fragLen = fragPos + boxSize;
 				break;
 			}
-			$fragPos += $boxSize;
+			fragPos += boxSize;
 		}
 
-		LogDebug(sprintf("\nFragment %d:\n" + this.format . "%-16s", $fragNum, "Type", "CurrentTS", "PreviousTS", "Size", "Position"), $debug);
-		while ($fragPos < $fragLen)
+		LogDebug("\nFragment "+fragNum+":\n" + format + "Type - CurrentTS - PreviousTS - Size - Position");
+		while (fragPos < fragLen)
 		{
-			$packetType = ReadByte($frag, $fragPos);
-			$packetSize = ReadInt24($frag, $fragPos + 1);
-			$packetTS   = ReadInt24($frag, $fragPos + 4);
-			$packetTS   = $packetTS | (ReadByte($frag, $fragPos + 7) << 24);
-			if ($packetTS & 0x80000000)
-				$packetTS &= 0x7FFFFFFF;
-			$totalTagLen = this.tagHeaderLen + $packetSize + this.prevTagSize;
+			byte packetType = ReadByte(frag, fragPos);
+			int packetSize = ReadInt24(frag, fragPos + 1);
+			int packetTS   = ReadInt24(frag, fragPos + 4);
+			packetTS       = packetTS | (frag[fragPos + 7] << 24);
+			if (packetTS & 0x80000000)
+				packetTS &= 0x7FFFFFFF;
+			totalTagLen = tagHeaderLen + packetSize + prevTagSize;
 
 			// Try to fix the odd timestamps and make them zero based
-			$currentTS = $packetTS;
-			$lastTS    = this.prevVideoTS >= this.prevAudioTS ? this.prevVideoTS : this.prevAudioTS;
-			$fixedTS   = $lastTS + FRAMEFIX_STEP;
-			if ((this.baseTS == INVALID_TIMESTAMP) and (($packetType == AUDIO) or ($packetType == VIDEO)))
-				this.baseTS = $packetTS;
-			if ((this.baseTS > 1000) and ($packetTS >= this.baseTS))
-				$packetTS -= this.baseTS;
-			if ($lastTS != INVALID_TIMESTAMP)
+			int currentTS = packetTS;
+			int lastTS        = prevVideoTS >= prevAudioTS ? prevVideoTS : prevAudioTS;
+			int fixedTS       = lastTS + FRAMEFIX_STEP;
+			if ((baseTS == INVALID_TIMESTAMP) && ((packetType == AUDIO) || (packetType == VIDEO)))
+				baseTS = packetTS;
+			if ((baseTS > 1000) && (packetTS >= baseTS))
+				packetTS -= baseTS;
+			if (lastTS != INVALID_TIMESTAMP)
 			{
-				$timeShift = $packetTS - $lastTS;
-				if ($timeShift > this.fixWindow)
+				timeShift = packetTS - lastTS;
+				if (timeShift > fixWindow)
 				{
-					LogDebug("Timestamp gap detected: PacketTS=" + $packetTS . " LastTS=" + $lastTS . " Timeshift=" + $timeShift, $debug);
-					if (this.baseTS < $packetTS)
-						this.baseTS += $timeShift - FRAMEFIX_STEP;
+					LogDebug("Timestamp gap detected: PacketTS=" + packetTS + " LastTS=" + lastTS + " Timeshift=" + timeShift);
+					if (baseTS < packetTS)
+						baseTS += timeShift - FRAMEFIX_STEP;
 					else
-						this.baseTS = $timeShift - FRAMEFIX_STEP;
-					$packetTS = $fixedTS;
+						baseTS = timeShift - FRAMEFIX_STEP;
+					packetTS = fixedTS;
 				}
 				else
 				{
-					$lastTS = $packetType == VIDEO ? this.prevVideoTS : this.prevAudioTS;
-					if ($packetTS < ($lastTS - this.fixWindow))
+					lastTS = packetType == VIDEO ? prevVideoTS : prevAudioTS;
+					if (packetTS < (lastTS - fixWindow))
 					{
-						if ((this.negTS != INVALID_TIMESTAMP) and (($packetTS + this.negTS) < ($lastTS - this.fixWindow)))
-							this.negTS = INVALID_TIMESTAMP;
-						if (this.negTS == INVALID_TIMESTAMP)
+						if ((negTS != INVALID_TIMESTAMP) && ((packetTS + negTS) < (lastTS - fixWindow)))
+							negTS = INVALID_TIMESTAMP;
+						if (negTS == INVALID_TIMESTAMP)
 						{
-							this.negTS = $fixedTS - $packetTS;
-							LogDebug("Negative timestamp detected: PacketTS=" + $packetTS . " LastTS=" + $lastTS . " NegativeTS=" + this.negTS, $debug);
-							$packetTS = $fixedTS;
+							negTS = fixedTS - packetTS;
+							LogDebug("Negative timestamp detected: PacketTS=" + packetTS + " LastTS=" + lastTS + " NegativeTS=" + negTS);
+							packetTS = fixedTS;
 						}
 						else
 						{
-							if (($packetTS + this.negTS) <= ($lastTS + this.fixWindow))
-								$packetTS += this.negTS;
+							if ((packetTS + negTS) <= (lastTS + fixWindow))
+								packetTS += negTS;
 							else
 							{
-								this.negTS = $fixedTS - $packetTS;
-								LogDebug("Negative timestamp override: PacketTS=" + $packetTS . " LastTS=" + $lastTS . " NegativeTS=" + this.negTS, $debug);
-								$packetTS = $fixedTS;
+								negTS = fixedTS - packetTS;
+								LogDebug("Negative timestamp override: PacketTS=" + packetTS + " LastTS=" + lastTS + " NegativeTS=" + negTS);
+								packetTS = fixedTS;
 							}
 						}
 					}
 				}
 			}
-			if ($packetTS != $currentTS)
-				WriteFlvTimestamp($frag, $fragPos, $packetTS);
+			if (packetTS != currentTS)
+				WriteFlvTimestamp(frag, fragPos, packetTS);
 
-			switch ($packetType)
+			switch (packetType)
 			{
 			case AUDIO:
-				if ($packetTS > this.prevAudioTS - this.fixWindow)
+				if (packetTS > prevAudioTS - fixWindow)
 				{
-					$FrameInfo = ReadByte($frag, $fragPos + this.tagHeaderLen);
-					$CodecID   = ($FrameInfo & 0xF0) >> 4;
-					if ($CodecID == CODEC_ID_AAC)
+					FrameInfo = $frag[fragPos + tagHeaderLen];
+					CodecID   = (FrameInfo & 0xF0) >> 4;
+					if (CodecID == CODEC_ID_AAC)
 					{
-						$AAC_PacketType = ReadByte($frag, $fragPos + this.tagHeaderLen + 1);
-						if ($AAC_PacketType == AAC_SEQUENCE_HEADER)
+						AAC_PacketType = frag[fragPos + tagHeaderLen + 1];
+						if (AAC_PacketType == AAC_SEQUENCE_HEADER)
 						{
-							if (this.AAC_HeaderWritten)
+							if (AAC_HeaderWritten)
 							{
-								LogDebug(sprintf("%s\n" + this.format, "Skipping AAC sequence header", "AUDIO", $packetTS, this.prevAudioTS, $packetSize), $debug);
+								LogDebug(format + "Skipping AAC sequence header\nformat Skipping AAC sequence header AUDIO - "+ packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
 								break;
 							}
 							else
 							{
-								LogDebug("Writing AAC sequence header", $debug);
-								this.AAC_HeaderWritten = true;
+								LogDebug("Writing AAC sequence header");
+								AAC_HeaderWritten = true;
 							}
 						}
-						else if (!this.AAC_HeaderWritten)
+						else if (!AAC_HeaderWritten)
 						{
-							LogDebug(sprintf("%s\n" + this.format, "Discarding audio packet received before AAC sequence header", "AUDIO", $packetTS, this.prevAudioTS, $packetSize), $debug);
+							LogDebug(format + "Discarding audio packet received before AAC sequence header AUDIO - "+ packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
 							break;
 						}
 					}
-					if ($packetSize > 0)
+					if (packetSize > 0)
 					{
 						// Check for packets with non-monotonic audio timestamps and fix them
-						if (!(($CodecID == CODEC_ID_AAC) and (($AAC_PacketType == AAC_SEQUENCE_HEADER) or this.prevAAC_Header)))
-						if ((this.prevAudioTS != INVALID_TIMESTAMP) and ($packetTS <= this.prevAudioTS))
+						if (!((CodecID == CODEC_ID_AAC) && ((AAC_PacketType == AAC_SEQUENCE_HEADER) || prevAAC_Header)))
+						if ((prevAudioTS != INVALID_TIMESTAMP) && (packetTS <= prevAudioTS))
 						{
-							LogDebug(sprintf("%s\n" + this.format, "Fixing audio timestamp", "AUDIO", $packetTS, this.prevAudioTS, $packetSize), $debug);
-							$packetTS += (FRAMEFIX_STEP / 5) + (this.prevAudioTS - $packetTS);
-							WriteFlvTimestamp($frag, $fragPos, $packetTS);
+							LogDebug(format + " Fixing audio timestamp - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
+							packetTS += (FRAMEFIX_STEP / 5) + (prevAudioTS - packetTS);
+							WriteFlvTimestamp(frag, fragPos, packetTS);
 						}
-						if (is_resource($flv))
+						if (is_resource(flv))
 						{
-							this.pAudioTagPos = ftell($flv);
-							$status             = fwrite($flv, substr($frag, $fragPos, $totalTagLen), $totalTagLen);
-							if (!$status)
+							pAudioTagPos = ftell(flv);
+							status             = fwrite(flv, substr(frag, fragPos, totalTagLen), totalTagLen);
+							if (!status)
 								LogError("Failed to write flv data to file");
-							if ($debug)
-								LogDebug(sprintf(this.format . "%-16s", "AUDIO", $packetTS, this.prevAudioTS, $packetSize, this.pAudioTagPos));
+							LogDebug(format + " - AUDIO - " + packetTS+" - "+prevAudioTS+" - "+packetSize+" - "+pAudioTagPos);
 						}
 						else
 						{
-							$flvData .= substr($frag, $fragPos, $totalTagLen);
-							if ($debug)
-								LogDebug(sprintf(this.format, "AUDIO", $packetTS, this.prevAudioTS, $packetSize));
+							byte[] new_flvData = new byte[flvData.Length + totalTagLen];
+							Buffer.BlockCopy(flvData, 0, concat, 0, flvData.Length);
+							Buffer.BlockCopy(frag, flvData.Length, new_flvData, fragPos, totalTagLen);
+							flvData = new_flvData;
+							LogDebug(format + "AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize));
 						}
-						if (($CodecID == CODEC_ID_AAC) and ($AAC_PacketType == AAC_SEQUENCE_HEADER))
-							this.prevAAC_Header = true;
+						if ((CodecID == CODEC_ID_AAC) and (AAC_PacketType == AAC_SEQUENCE_HEADER))
+							prevAAC_Header = true;
 						else
-							this.prevAAC_Header = false;
-						this.prevAudioTS  = $packetTS;
-						this.pAudioTagLen = $totalTagLen;
+							prevAAC_Header = false;
+						prevAudioTS  = packetTS;
+						pAudioTagLen = totalTagLen;
 					}
 					else
-						LogDebug(sprintf("%s\n" + this.format, "Skipping small sized audio packet", "AUDIO", $packetTS, this.prevAudioTS, $packetSize), $debug);
+						LogDebug(format+" Skipping small sized audio packet - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
 				}
 				else
-					LogDebug(sprintf("%s\n" + this.format, "Skipping audio packet in fragment $fragNum", "AUDIO", $packetTS, this.prevAudioTS, $packetSize), $debug);
-				if (!this.audio)
-					this.audio = true;
+					LogDebug(format + " Skipping audio packet in fragment "+fragNum+" - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
+				if (!audio)
+					audio = true;
 				break;
 			case VIDEO:
-				if ($packetTS > this.prevVideoTS - this.fixWindow)
+				if (packetTS > prevVideoTS - fixWindow)
 				{
-					$FrameInfo = ReadByte($frag, $fragPos + this.tagHeaderLen);
-					$FrameType = ($FrameInfo & 0xF0) >> 4;
-					$CodecID   = $FrameInfo & 0x0F;
-					if ($FrameType == FRAME_TYPE_INFO)
+					FrameInfo = ReadByte(frag, fragPos + tagHeaderLen);
+					FrameType = (FrameInfo & 0xF0) >> 4;
+					CodecID   = FrameInfo & 0x0F;
+					if (FrameType == FRAME_TYPE_INFO)
 					{
-						LogDebug(sprintf("%s\n" + this.format, "Skipping video info frame", "VIDEO", $packetTS, this.prevVideoTS, $packetSize), $debug);
+						LogDebug(format + " Skipping video info frame - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 						break;
 					}
-					if ($CodecID == CODEC_ID_AVC)
+					if (CodecID == CODEC_ID_AVC)
 					{
-						$AVC_PacketType = ReadByte($frag, $fragPos + this.tagHeaderLen + 1);
-						if ($AVC_PacketType == AVC_SEQUENCE_HEADER)
+						AVC_PacketType = ReadByte(frag, fragPos + tagHeaderLen + 1);
+						if (AVC_PacketType == AVC_SEQUENCE_HEADER)
 						{
-							if (this.AVC_HeaderWritten)
+							if (AVC_HeaderWritten)
 							{
-								LogDebug(sprintf("%s\n" + this.format, "Skipping AVC sequence header", "VIDEO", $packetTS, this.prevVideoTS, $packetSize), $debug);
+								LogDebug(format + " Skipping AVC sequence header - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 								break;
 							}
 							else
 							{
-								LogDebug("Writing AVC sequence header", $debug);
-								this.AVC_HeaderWritten = true;
+								LogDebug("Writing AVC sequence header");
+								AVC_HeaderWritten = true;
 							}
 						}
-						else if (!this.AVC_HeaderWritten)
+						else if (!AVC_HeaderWritten)
 						{
-							LogDebug(sprintf("%s\n" + this.format, "Discarding video packet received before AVC sequence header", "VIDEO", $packetTS, this.prevVideoTS, $packetSize), $debug);
+							LogDebug(format + "Discarding video packet received before AVC sequence header - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 							break;
 						}
 					}
-					if ($packetSize > 0)
+					if (packetSize > 0)
 					{
-						$pts = $packetTS;
-						if (($CodecID == CODEC_ID_AVC) and ($AVC_PacketType == AVC_NALU))
+						pts = packetTS;
+						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_NALU)
 						{
-							$cts = ReadInt24($frag, $fragPos + this.tagHeaderLen + 2);
-							$cts = ($cts + 0xff800000) ^ 0xff800000;
-							$pts = $packetTS + $cts;
-							if ($cts != 0)
-								LogDebug("DTS: $packetTS CTS: $cts PTS: $pts", $debug);
+							int cts = ReadInt24(frag, fragPos + tagHeaderLen + 2);
+							cts = (cts + 0xff800000) ^ 0xff800000;
+							pts = packetTS + cts;
+							if (cts != 0)
+								LogDebug("DTS: $packetTS CTS: "+cts+" PTS: " +pts);
 						}
 
 						// Check for packets with non-monotonic video timestamps and fix them
-						if (!(($CodecID == CODEC_ID_AVC) and (($AVC_PacketType == AVC_SEQUENCE_HEADER) or ($AVC_PacketType == AVC_SEQUENCE_END) or this.prevAVC_Header)))
-						if ((this.prevVideoTS != INVALID_TIMESTAMP) and ($packetTS <= this.prevVideoTS))
+						if (!(CodecID == CODEC_ID_AVC && (AVC_PacketType == AVC_SEQUENCE_HEADER || AVC_PacketType == AVC_SEQUENCE_END || prevAVC_Header)))
+						if (prevVideoTS != INVALID_TIMESTAMP && packetTS <= prevVideoTS)
 						{
-							LogDebug(sprintf("%s\n" + this.format, "Fixing video timestamp", "VIDEO", $packetTS, this.prevVideoTS, $packetSize), $debug);
-							$packetTS += (FRAMEFIX_STEP / 5) + (this.prevVideoTS - $packetTS);
-							WriteFlvTimestamp($frag, $fragPos, $packetTS);
+							LogDebug(format+" Fixing video timestamp - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+							packetTS += (FRAMEFIX_STEP / 5) + (prevVideoTS - packetTS);
+							WriteFlvTimestamp(frag, fragPos, packetTS);
 						}
-						if (is_resource($flv))
+						if (is_resource(flv))
 						{
-							this.pVideoTagPos = ftell($flv);
-							$status             = fwrite($flv, substr($frag, $fragPos, $totalTagLen), $totalTagLen);
-							if (!$status)
+							pVideoTagPos = ftell(flv);
+							status             = fwrite(flv, substr(frag, fragPos, totalTagLen), totalTagLen);
+							if (!status)
 								LogError("Failed to write flv data to file");
-							if ($debug)
-								LogDebug(sprintf(this.format . "%-16s", "VIDEO", $packetTS, this.prevVideoTS, $packetSize, this.pVideoTagPos));
+							LogDebug(format + " VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize+" - "+pVideoTagPos);
 						}
 						else
 						{
-							$flvData .= substr($frag, $fragPos, $totalTagLen);
-							if ($debug)
-								LogDebug(sprintf(this.format, "VIDEO", $packetTS, this.prevVideoTS, $packetSize));
+							flvData += substr(frag, fragPos, totalTagLen);
+							LogDebug(format+" VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 						}
-						if (($CodecID == CODEC_ID_AVC) and ($AVC_PacketType == AVC_SEQUENCE_HEADER))
-							this.prevAVC_Header = true;
+						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_SEQUENCE_HEADER)
+							prevAVC_Header = true;
 						else
-							this.prevAVC_Header = false;
-						this.prevVideoTS  = $packetTS;
-						this.pVideoTagLen = $totalTagLen;
+							prevAVC_Header = false;
+						prevVideoTS  = packetTS;
+						pVideoTagLen = totalTagLen;
 					}
 					else
-						LogDebug(sprintf("%s\n" + this.format, "Skipping small sized video packet", "VIDEO", $packetTS, this.prevVideoTS, $packetSize), $debug);
+						LogDebug(format+" Skipping small sized video packet - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 				}
 				else
-					LogDebug(sprintf("%s\n" + this.format, "Skipping video packet in fragment $fragNum", "VIDEO", $packetTS, this.prevVideoTS, $packetSize), $debug);
-				if (!this.video)
-					this.video = true;
+					LogDebug(format+" Skipping video packet in fragment "+fragNum+" - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+				if (!video)
+					video = true;
 				break;
 			case SCRIPT_DATA:
 				break;
 			default:
-				if (($packetType == 10) or ($packetType == 11))
+				if (packetType == 10 || packetType == 11)
 					LogError("This stream is encrypted with Akamai DRM. Decryption of such streams isn't currently possible with this script.", 2);
-				else if (($packetType == 40) or ($packetType == 41))
+				else if (packetType == 40 || packetType == 41)
 					LogError("This stream is encrypted with FlashAccess DRM. Decryption of such streams isn't currently possible with this script.", 2);
 				else
 				{
-					LogInfo("Unknown packet type " + $packetType . " encountered! Unable to process fragment $fragNum");
+					LogInfo("Unknown packet type " + packetType + " encountered! Unable to process fragment "+fragNum);
 					break 2;
 				}
 			}
-			$fragPos += $totalTagLen;
+			fragPos += totalTagLen;
 		}
-		this.duration = round($packetTS / 1000, 0);
-		if (is_resource($flv))
+		duration = round(packetTS / 1000, 0);
+		if (is_resource(flv))
 		{
-			this.filesize = ftell($flv) / (1024 * 1024);
+			filesize = ftell(flv) / (1024 * 1024);
 			return true;
 		}
 		else
-			return $flvData;
+			return flvData;
 	}
-*/
 
-	public int WriteFragment (Frag_response download)
+	public int WriteFragment (Frag_response frag)
 	{
-		frags [download.id] = download;
-
-		int available = frags.Count;
-		for (int i = 0; i < available; i++) {
-			if (frags.ContainsKey (lastFrag + 1)) {
-				Frag_response frag = frags [lastFrag + 1];
-				if (frag.response.Length == 0) {
-					LogDebug ("Writing fragment " + frag.id + " to flv file");
-					if (!opt.ContainsKey ("file")) {
-						string outFile = "";
-						if (outFileGlobal != "") {
-							outFile = JoinUrl (outDir, outFile + ".flv");
-						} else {
-							outFile = JoinUrl (outDir, baseFilename + ".flv");
-						}
-						InitDecoder ();
-						DecodeFragment (frag.response, frag.id);
-						opt ["file"] = WriteFlvFile (outFile, audio, video);
-						if (metadata)
-							WriteMetadata (opt ["file"]);
-
-						InitDecoder ();
-					}
-					flvData = DecodeFragment (frag.response, frag.id);
-					if (strlen (flvData)) {
-						status = fwrite (opt ["file"], flvData, strlen (flvData));
-						if (!status)
-							LogError ("Failed to write flv data");
-						filesize = ftell (opt ["file"]) / (1024 * 1024);
-					}
-					lastFrag = frag.id;
+		if (frag.response.Length == 0) {
+			LogDebug ("Writing fragment " + frag.id + " to flv file");
+			if (!opt.ContainsKey ("file")) {
+				string outFile = "";
+				if (outFileGlobal != "") {
+					outFile = JoinUrl (outDir, outFile + ".flv");
 				} else {
-					lastFrag += 1;
-					LogDebug ("Skipping failed fragment " + lastFrag);
+					outFile = JoinUrl (outDir, baseFilename + ".flv");
 				}
-				unset (frags [lastFrag]);
-			} else
-				break;
+				InitDecoder ();
+				DecodeFragment (frag.response, frag.id);
+				opt ["file"] = WriteFlvFile (outFile, audio, video);
+				if (metadata)
+					WriteMetadata (opt ["file"]);
 
-			if (opt ["tDuration"] && ((opt ["duration"] + duration) >= opt ["tDuration"])) {
-				LogInfo ("");
-				LogInfo ((opt ["duration"] + this.duration) + " seconds of content has been recorded successfully.", true);
-				return STOP_PROCESSING;
+				InitDecoder ();
 			}
+			byte[] flvData = DecodeFragment (frag.response, frag.id);
+			if (flvData.Length != 0) {
+				fwrite (opt ["file"], flvData, flvData.Length);
+				filesize = ftell (opt ["file"]) / (1024 * 1024);
+			}
+			lastFrag = frag.id;
+		} else {
+			lastFrag += 1;
+			LogDebug ("Skipping failed fragment " + lastFrag);
 		}
-
-		if (this.frags.Count == 0)
-			unset (this.frags);
-		return true;
+		unset (frags [lastFrag]);
 	}
 }
 
