@@ -14,16 +14,21 @@ public class F4F : Functions
 	Dictionary<int,Frag_table_content> fragTable;
 	int segStart = -1, fragStart = -1, fragCount = -1, parallel = 8;
 
+	Dictionary<string, object> frags;
 
 
 
 
 
 
+
+
+
+	int discontinuity;
 	object audio, auth, baseTS, fixWindow;
 	object processed, video;
 	object prevTagSize, tagHeaderLen;
-	object lastFrag, discontinuity;
+	object lastFrag;
 	object prevAudioTS, prevVideoTS, pAudioTagLen, pVideoTagLen, pAudioTagPos, pVideoTagPos;
 	object prevAVC_Header, prevAAC_Header, AVC_HeaderWritten, AAC_HeaderWritten;
 	object negTS;
@@ -34,7 +39,7 @@ public class F4F : Functions
 		this.fixWindow = 1000;
 		this.processed = false;
 		this.lastFrag = 0;
-		this.discontinuity = "";
+		this.discontinuity = 0;
 		this.InitDecoder ();
 	}
 
@@ -460,7 +465,7 @@ public class F4F : Functions
 				}
 				if (frag.ContainsKey("response"))
 				{
-					if (WriteFragment(frag, opt) == STOP_PROCESSING){
+					if (WriteFragment(frag) == STOP_PROCESSING){
 						w1 = false;
 						break;
 					}
@@ -476,13 +481,13 @@ public class F4F : Functions
 				break;
 			}
 
-			downloads = cc->checkDownloads();
-			if (downloads != false)
+			Dictionary<string, object> downloads = cc->checkDownloads();
+			if (downloads.Count != 0)
 			{
-				for (int i = 0; i < count(downloads); i++)
+				for (int i = 0; i < downloads.Count; i++)
 				{
-					frag       = array();
-					download   = downloads[i];
+					Dictionary<string, object> frag = new Dictionary<string, object>();
+					Dictionary<string, object> download   = downloads[i];
 					frag["id"] = download["id"];
 					if (download["status"] == 200)
 					{
@@ -519,11 +524,11 @@ public class F4F : Functions
 						frag["response"] = false;
 						rename = true;
 					}
-					if (isset (frag ["response"]))
-					if (WriteFragment (frag, opt) == STOP_PROCESSING) {
-						w2 = false;
-						break;
-					}
+					if (frag.ContainsKey("response"))
+						if (WriteFragment (frag) == STOP_PROCESSING) {
+							w2 = false;
+							break;
+						}
 				}
 				unset(downloads, download);
 			}
@@ -827,84 +832,73 @@ public class F4F : Functions
 			return $flvData;
 	}
 */
-	public void WriteFragment($download, &$opt)
-	{
-		this.frags[$download["id"]] = $download;
 
-		$available = count(this.frags);
-		for ($i = 0; $i < $available; $i++)
+	public void WriteFragment(Dictionary<string, object> download, &opt)
+	{
+		frags[download["id"]] = download;
+
+		int available = frags.Count;
+		for (int i = 0; i < available; i++)
 		{
-			if (isset(this.frags[this.lastFrag + 1]))
+			if (frags.ContainsKey(lastFrag + 1))
 			{
-				$frag = this.frags[this.lastFrag + 1];
-				if ($frag["response"] !== false)
+				frag = frags[lastFrag + 1];
+				if (frag["response"] != false)
 				{
-					LogDebug("Writing fragment " + $frag["id"] . " to flv file");
-					if (!isset($opt["file"]))
+					LogDebug("Writing fragment " + frag["id"] + " to flv file");
+					if (!opt.ContainsKey("file"))
 					{
-						$opt["debug"] = false;
-						if (this.play)
-							$outFile = STDOUT;
-						else if (this.outFile)
+						if (outFile)
 						{
-							if ($opt["filesize"])
-								$outFile = JoinUrl(this.outDir, this.outFile . "-" . this.fileCount++ . ".flv");
+							if (opt["filesize"])
+								outFile = JoinUrl(outDir, outFile + "-" + (fileCount++) + ".flv");
 							else
-								$outFile = JoinUrl(this.outDir, this.outFile . ".flv");
+								outFile = JoinUrl(this.outDir, this.outFile + ".flv");
 						}
 						else
 						{
-							if ($opt["filesize"])
-								$outFile = JoinUrl(this.outDir, this.baseFilename . "-" . this.fileCount++ . ".flv");
+							if (opt["filesize"])
+								outFile = JoinUrl(this.outDir, this.baseFilename + "-" + (this.fileCount++) + ".flv");
 							else
-								$outFile = JoinUrl(this.outDir, this.baseFilename . ".flv");
+								outFile = JoinUrl(this.outDir, this.baseFilename + ".flv");
 						}
-						this.InitDecoder();
-						this.DecodeFragment($frag["response"], $frag["id"], $opt);
-						$opt["file"] = WriteFlvFile($outFile, this.audio, this.video);
-						if (this.metadata)
-							WriteMetadata($this, $opt["file"]);
+						InitDecoder();
+						DecodeFragment(frag["response"], frag["id"]);
+						opt["file"] = WriteFlvFile(outFile, audio, video);
+						if (metadata)
+							WriteMetadata($this, opt["file"]);
 
-						$opt["debug"] = this.debug;
-						this.InitDecoder();
+						InitDecoder();
 					}
-					$flvData = this.DecodeFragment($frag["response"], $frag["id"], $opt);
-					if (strlen($flvData))
+					flvData = DecodeFragment(frag["response"], frag["id"]);
+					if (strlen(flvData))
 					{
-						$status = fwrite($opt["file"], $flvData, strlen($flvData));
-						if (!$status)
+						status = fwrite(opt["file"], flvData, strlen(flvData));
+						if (!status)
 							LogError("Failed to write flv data");
-						if (!this.play)
-							this.filesize = ftell($opt["file"]) / (1024 * 1024);
+						filesize = ftell(opt["file"]) / (1024 * 1024);
 					}
-					this.lastFrag = $frag["id"];
+					lastFrag = frag["id"];
 				}
 				else
 				{
-					this.lastFrag += 1;
-					LogDebug("Skipping failed fragment " + this.lastFrag);
+					lastFrag += 1;
+					LogDebug("Skipping failed fragment " + lastFrag);
 				}
-				unset(this.frags[this.lastFrag]);
+				unset(frags[lastFrag]);
 			}
 			else
 				break;
 
-			if ($opt["tDuration"] and (($opt["duration"] + this.duration) >= $opt["tDuration"]))
+			if (opt["tDuration"] && ((opt["duration"] + duration) >= opt["tDuration"]))
 			{
 				LogInfo("");
-				LogInfo(($opt["duration"] + this.duration) . " seconds of content has been recorded successfully.", true);
+				LogInfo((opt["duration"] + this.duration) + " seconds of content has been recorded successfully.", true);
 				return STOP_PROCESSING;
-			}
-			if ($opt["filesize"] and (this.filesize >= $opt["filesize"]))
-			{
-				this.filesize = 0;
-				$opt["duration"] += this.duration;
-				fclose($opt["file"]);
-				unset($opt["file"]);
 			}
 		}
 
-		if (this.frags.Count() == 0)
+		if (this.frags.Count == 0)
 			unset(this.frags);
 		return true;
 	}
