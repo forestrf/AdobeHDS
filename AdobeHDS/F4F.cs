@@ -451,14 +451,13 @@ public class F4F : Functions
 			}
 
 			if (VerifyFragment (frag.response)) {
-				LogDebug ("Fragment " + baseFilename + frag.id + " successfully downloaded");
-				file_put_contents (baseFilename + frag.id, frag.response);
+				LogDebug ("Fragment " + frag.filename + " successfully downloaded");
 			} else {
 				fragNum--;
 				File.Delete (frag.filename);
 				LogDebug ("Fragment " + frag.id + " failed to verify");
 			}
-			if (frag.response) {
+			if (frag.response.Length != 0) {
 				if (WriteFragment (frag) == STOP_PROCESSING) {
 					break;
 				}
@@ -469,33 +468,35 @@ public class F4F : Functions
 		LogDebug ("\nAll fragments downloaded successfully\n");
 		processed = true;
 	}
-	/*
-	function VerifyFragment(&$frag)
+
+	public bool VerifyFragment(byte[] frag)
 	{
-		$fragPos = 0;
-		$fragLen = strlen($frag);
+		int fragPos = 0;
+		int fragLen = frag.Length;
 
 		//Some moronic servers add wrong boxSize in header causing fragment verification to fail so we have to fix the boxSize before processing the fragment.          
-		while ($fragPos < $fragLen)
+		while (fragPos < fragLen)
 		{
-			ReadBoxHeader($frag, $fragPos, $boxType, $boxSize);
-			if ($boxType == "mdat")
+			string boxType = "";
+			long boxSize = 0;
+			ReadBoxHeader(frag, ref fragPos, ref boxType, ref boxSize);
+			if (boxType == "mdat")
 			{
-				$len = strlen(substr($frag, $fragPos, $boxSize));
-				if ($boxSize and ($len == $boxSize))
+				long len = boxSize - fragPos;
+				if (boxSize != 0 && len == boxSize)
 					return true;
 				else
 				{
-					$boxSize = $fragLen - $fragPos;
-					WriteBoxSize($frag, $fragPos, $boxType, $boxSize);
+					boxSize = fragLen - fragPos;
+					WriteBoxSize(frag, fragPos, boxType, boxSize);
 					return true;
 				}
 			}
-			$fragPos += $boxSize;
+			fragPos += (int)boxSize;
 		}
 		return false;
 	}
-
+	/*
 	function DecodeFragment($frag, $fragNum, $opt = array())
 	{
 		$debug = this.debug;
@@ -771,8 +772,8 @@ public class F4F : Functions
 		for (int i = 0; i < available; i++) {
 			if (frags.ContainsKey (lastFrag + 1)) {
 				Frag_response frag = frags [lastFrag + 1];
-				if (frag.response.Length = 0) {
-					LogDebug ("Writing fragment " + frag ["id"] + " to flv file");
+				if (frag.response.Length == 0) {
+					LogDebug ("Writing fragment " + frag.id + " to flv file");
 					if (!opt.ContainsKey ("file")) {
 						string outFile = "";
 						if (outFileGlobal != "") {
@@ -781,21 +782,21 @@ public class F4F : Functions
 							outFile = JoinUrl (outDir, baseFilename + ".flv");
 						}
 						InitDecoder ();
-						DecodeFragment (frag ["response"], frag ["id"]);
+						DecodeFragment (frag.response, frag.id);
 						opt ["file"] = WriteFlvFile (outFile, audio, video);
 						if (metadata)
 							WriteMetadata (opt ["file"]);
 
 						InitDecoder ();
 					}
-					flvData = DecodeFragment (frag ["response"], frag ["id"]);
+					flvData = DecodeFragment (frag.response, frag.id);
 					if (strlen (flvData)) {
 						status = fwrite (opt ["file"], flvData, strlen (flvData));
 						if (!status)
 							LogError ("Failed to write flv data");
 						filesize = ftell (opt ["file"]) / (1024 * 1024);
 					}
-					lastFrag = frag ["id"];
+					lastFrag = frag.id;
 				} else {
 					lastFrag += 1;
 					LogDebug ("Skipping failed fragment " + lastFrag);

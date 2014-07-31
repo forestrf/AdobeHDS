@@ -100,18 +100,26 @@ public class Functions : Defines
 		str[pos + 2] = pack("C", (int_v & 0xFF00) >> 8);
 		str[pos + 3] = pack("C", int_v & 0xFF);
 	}
-
-	public static void WriteBoxSize(ref string str, int pos, string type, int size)
+*/
+	public void WriteBoxSize(byte[] str, int pos, string type, long size)
 	{
-		if (str.Substring(pos - 4, 4) == type)
-			WriteInt32(str, pos - 8, size);
+		if (ReadString (str, pos - 4, 4) == type) {
+			WriteToByteArray (str, pos - 8, BitConverter.GetBytes (size));
+		}
 		else
 		{
-			WriteInt32(str, pos - 8, 0);
-			WriteInt32(str, pos - 4, size);
+			WriteToByteArray (str, pos - 8, BitConverter.GetBytes (0));
+			WriteToByteArray (str, pos - 4, BitConverter.GetBytes (size));
 		}
 	}
 
+	public void WriteToByteArray(byte[] str, int pos, byte[] replace){
+		for (int i = 0; i < replace.Length; i++) {
+			str [i + pos] = replace [i];
+		}
+	}
+
+	/*
 	public static void WriteFlvTimestamp(ref object frag, int fragPos, object packetTS)
 	{
 		WriteInt24(frag, fragPos + 4, (packetTS & 0x00FFFFFF));
