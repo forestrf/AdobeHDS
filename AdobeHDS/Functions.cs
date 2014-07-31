@@ -100,14 +100,13 @@ public class Functions : Defines
 			str [i + pos] = replace [i];
 		}
 	}
-
-	/*
-	public static void WriteFlvTimestamp(ref object frag, int fragPos, object packetTS)
+		
+	public void WriteFlvTimestamp(byte[] frag, int fragPos, int packetTS)
 	{
-		WriteInt24(frag, fragPos + 4, (packetTS & 0x00FFFFFF));
-		WriteByte(frag, fragPos + 7, (packetTS & 0xFF000000) >> 24);
+		WriteToByteArray (frag, fragPos + 4, BitConverter.GetBytes (packetTS & 0x00FFFFFF));
+		frag[fragPos + 7] = (byte)((packetTS & 0xFF000000) >> 24);
 	}
-*/
+
 	public string AbsoluteUrl(string baseUrl, string url)
 	{
 		if (!isHttpUrl(url))
@@ -115,7 +114,7 @@ public class Functions : Defines
 		return NormalizePath(url);
 	}
 	/*
-	public static string GetString(object o)
+	public string GetString(object o)
 	{
 		return o.ToString().Trim();
 	}
@@ -125,12 +124,12 @@ public class Functions : Defines
 		return url.IndexOf("http") == 0;
 	}
 	/*
-	public static bool isRtmpUrl(string url)
+	public bool isRtmpUrl(string url)
 	{
 		return Regex.IsMatch("^rtm(p|pe|pt|pte|ps|pts|fp)://", url, RegexOptions.IgnoreCase);
 	}
 */
-	public static string JoinUrl(string firstUrl, string secondUrl)
+	public string JoinUrl(string firstUrl, string secondUrl)
 	{
 		if (firstUrl != null && secondUrl != null)
 		{
@@ -146,7 +145,7 @@ public class Functions : Defines
 			return secondUrl;
 	}
 	/*
-	public static object KeyName(List a, int pos)
+	public object KeyName(List a, int pos)
 	{
 		temp = array_slice(a, pos, 1, true);
 		return key(temp);
@@ -192,11 +191,11 @@ public class Functions : Defines
 		return outPath;
 	}
 	/*
-	public static void PrintLine(string msg)
+	public void PrintLine(string msg)
 	{
 		PrintLine(msg, false)
 	}
-	public static void PrintLine(string msg, bool progress)
+	public void PrintLine(string msg, bool progress)
 	{
 		if (msg)
 		{
@@ -239,7 +238,7 @@ public class Functions : Defines
 		return outFile;
 	}
 	/*
-	public static void RenameFragments(string baseFilename, int fragNum, string fileExt)
+	public void RenameFragments(string baseFilename, int fragNum, string fileExt)
 	{
 		List<string>files = new List<string>();
 		int retries = 0;
@@ -269,7 +268,7 @@ public class Functions : Defines
 			rename(files[i], baseFilename + (i + 1));
 	}
 
-	public static void ShowHeader()
+	public void ShowHeader()
 	{
 		string header = "KSV Adobe HDS Downloader";
 		int len       = header.Length;
@@ -278,15 +277,15 @@ public class Functions : Defines
 		Console.WriteLine(format, header);
 	}
 
-	public static object WriteFlvFile(string outFile)
+	public object WriteFlvFile(string outFile)
 	{
 		return WriteFlvFile(outFile, true)
 	}
-	public static object WriteFlvFile(string outFile, bool audio)
+	public object WriteFlvFile(string outFile, bool audio)
 	{
 		return WriteFlvFile(outFile, audio, true)
 	}
-	public static object WriteFlvFile(string outFile, bool audio, bool video)
+	public object WriteFlvFile(string outFile, bool audio, bool video)
 	{
 		string flvHeader = pack("H*", "464c5601050000000900000000");
 		int flvHeaderLen = flvHeader.Length;
@@ -304,7 +303,7 @@ public class Functions : Defines
 		return flv;
 	}
 
-	public static object WriteMetadata(F4F f4f, string flv)
+	public object WriteMetadata(F4F f4f, string flv)
 	{
 		if (f4f.media.Length > 0 && f4f.media["metadata"])
 		{

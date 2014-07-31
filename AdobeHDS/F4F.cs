@@ -37,38 +37,27 @@ public class F4F : Functions
 
 
 	int discontinuity = 0;
-	object audio, auth, baseTS, fixWindow;
-	object video;
-	object prevTagSize, tagHeaderLen;
-	object prevAudioTS, prevVideoTS, pAudioTagLen, pVideoTagLen, pAudioTagPos, pVideoTagPos;
-	object prevAVC_Header, prevAAC_Header, AVC_HeaderWritten, AAC_HeaderWritten;
-	object negTS;
+	int fixWindow = 1000;
+	int prevAudioTS = Defines.INVALID_TIMESTAMP;
+	int prevVideoTS = Defines.INVALID_TIMESTAMP;
+	int baseTS = Defines.INVALID_TIMESTAMP;
+	int negTS = Defines.INVALID_TIMESTAMP;
+
+	bool audio = false;
+	bool video = false;
+	int prevTagSize = 4;
+	int tagHeaderLen = 11;
+	int pAudioTagLen = 0;
+	int pVideoTagLen = 0;
+	bool prevAVC_Header = false;
+	bool prevAAC_Header = false;
+	bool AVC_HeaderWritten = false;
+	bool AAC_HeaderWritten = false;
+
+	string auth = "";
 
 	public F4F ()
 	{
-		this.auth = "";
-		this.fixWindow = 1000;
-		this.InitDecoder ();
-	}
-
-	public void InitDecoder ()
-	{
-		this.audio = false;
-		this.video = false;
-		this.prevTagSize = 4;
-		this.tagHeaderLen = 11;
-		this.baseTS = INVALID_TIMESTAMP;
-		this.negTS = INVALID_TIMESTAMP;
-		this.prevAudioTS = INVALID_TIMESTAMP;
-		this.prevVideoTS = INVALID_TIMESTAMP;
-		this.pAudioTagLen = 0;
-		this.pVideoTagLen = 0;
-		this.pAudioTagPos = 0;
-		this.pVideoTagPos = 0;
-		this.prevAVC_Header = false;
-		this.prevAAC_Header = false;
-		this.AVC_HeaderWritten = false;
-		this.AAC_HeaderWritten = false;
 	}
 
 	public void ParseManifest (string manifest)
@@ -493,19 +482,19 @@ public class F4F : Functions
 		return false;
 	}
 
-	public object DecodeFragment(byte[] frag, int fragNum)
+	public byte[] DecodeFragment(byte[] frag, int fragNum)
 	{
 		bool flv   = false;
 
 		byte[] flvData = new byte[0];
 		int fragPos  = 0;
 		int packetTS = 0;
-		int fragLen  = frag.Length;
+		long fragLen  = frag.LongLength;
 
 		if (!VerifyFragment(frag))
 		{
 			LogInfo("Skipping fragment number "+fragNum);
-			return false;
+			return new byte[0];
 		}
 
 		while (fragPos < fragLen)
@@ -519,31 +508,31 @@ public class F4F : Functions
 				fragLen = fragPos + boxSize;
 				break;
 			}
-			fragPos += boxSize;
+			fragPos += (int)boxSize;
 		}
 
-		LogDebug("\nFragment "+fragNum+":\n" + format + "Type - CurrentTS - PreviousTS - Size - Position");
+		LogDebug("\nFragment "+fragNum+":\nType - CurrentTS - PreviousTS - Size - Position");
 		while (fragPos < fragLen)
 		{
-			byte packetType = ReadByte(frag, fragPos);
+			byte packetType = frag[fragPos];
 			int packetSize = ReadInt24(frag, fragPos + 1);
-			int packetTS   = ReadInt24(frag, fragPos + 4);
-			packetTS       = packetTS | (frag[fragPos + 7] << 24);
-			if (packetTS & 0x80000000)
+			packetTS = ReadInt24(frag, fragPos + 4);
+			packetTS = packetTS | (frag[fragPos + 7] << 24);
+			if ((packetTS & 0x80000000) != 0)
 				packetTS &= 0x7FFFFFFF;
-			totalTagLen = tagHeaderLen + packetSize + prevTagSize;
+			long totalTagLen = tagHeaderLen + packetSize + prevTagSize;
 
 			// Try to fix the odd timestamps and make them zero based
 			int currentTS = packetTS;
-			int lastTS        = prevVideoTS >= prevAudioTS ? prevVideoTS : prevAudioTS;
-			int fixedTS       = lastTS + FRAMEFIX_STEP;
-			if ((baseTS == INVALID_TIMESTAMP) && ((packetType == AUDIO) || (packetType == VIDEO)))
+			int lastTS    = prevVideoTS >= prevAudioTS ? prevVideoTS : prevAudioTS;
+			int fixedTS   = lastTS + FRAMEFIX_STEP;
+			if ((baseTS == Defines.INVALID_TIMESTAMP) && ((packetType == AUDIO) || (packetType == VIDEO)))
 				baseTS = packetTS;
 			if ((baseTS > 1000) && (packetTS >= baseTS))
 				packetTS -= baseTS;
-			if (lastTS != INVALID_TIMESTAMP)
+			if (lastTS != Defines.INVALID_TIMESTAMP)
 			{
-				timeShift = packetTS - lastTS;
+				int timeShift = packetTS - lastTS;
 				if (timeShift > fixWindow)
 				{
 					LogDebug("Timestamp gap detected: PacketTS=" + packetTS + " LastTS=" + lastTS + " Timeshift=" + timeShift);
@@ -558,9 +547,9 @@ public class F4F : Functions
 					lastTS = packetType == VIDEO ? prevVideoTS : prevAudioTS;
 					if (packetTS < (lastTS - fixWindow))
 					{
-						if ((negTS != INVALID_TIMESTAMP) && ((packetTS + negTS) < (lastTS - fixWindow)))
-							negTS = INVALID_TIMESTAMP;
-						if (negTS == INVALID_TIMESTAMP)
+						if ((negTS != Defines.INVALID_TIMESTAMP) && ((packetTS + negTS) < (lastTS - fixWindow)))
+							negTS = Defines.INVALID_TIMESTAMP;
+						if (negTS == Defines.INVALID_TIMESTAMP)
 						{
 							negTS = fixedTS - packetTS;
 							LogDebug("Negative timestamp detected: PacketTS=" + packetTS + " LastTS=" + lastTS + " NegativeTS=" + negTS);
@@ -583,21 +572,22 @@ public class F4F : Functions
 			if (packetTS != currentTS)
 				WriteFlvTimestamp(frag, fragPos, packetTS);
 
-			switch (packetType)
+			switch (ReadInt32(new byte[]{packetType, new byte(), new byte(), new byte()}, 0))
 			{
-			case AUDIO:
+			case Defines.AUDIO:
 				if (packetTS > prevAudioTS - fixWindow)
 				{
-					FrameInfo = $frag[fragPos + tagHeaderLen];
-					CodecID   = (FrameInfo & 0xF0) >> 4;
-					if (CodecID == CODEC_ID_AAC)
+					byte FrameInfo = frag[fragPos + tagHeaderLen];
+					int CodecID   = (FrameInfo & 0xF0) >> 4;
+					byte AAC_PacketType;
+					if (CodecID == Defines.CODEC_ID_AAC)
 					{
 						AAC_PacketType = frag[fragPos + tagHeaderLen + 1];
-						if (AAC_PacketType == AAC_SEQUENCE_HEADER)
+						if (AAC_PacketType == Defines.AAC_SEQUENCE_HEADER)
 						{
 							if (AAC_HeaderWritten)
 							{
-								LogDebug(format + "Skipping AAC sequence header\nformat Skipping AAC sequence header AUDIO - "+ packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
+								LogDebug("Skipping AAC sequence header\nformat Skipping AAC sequence header AUDIO - "+ packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
 								break;
 							}
 							else
@@ -608,70 +598,70 @@ public class F4F : Functions
 						}
 						else if (!AAC_HeaderWritten)
 						{
-							LogDebug(format + "Discarding audio packet received before AAC sequence header AUDIO - "+ packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
+							LogDebug("Discarding audio packet received before AAC sequence header AUDIO - "+ packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
 							break;
 						}
 					}
 					if (packetSize > 0)
 					{
 						// Check for packets with non-monotonic audio timestamps and fix them
-						if (!((CodecID == CODEC_ID_AAC) && ((AAC_PacketType == AAC_SEQUENCE_HEADER) || prevAAC_Header)))
-						if ((prevAudioTS != INVALID_TIMESTAMP) && (packetTS <= prevAudioTS))
+						if (!(CodecID == Defines.CODEC_ID_AAC && (AAC_PacketType == Defines.AAC_SEQUENCE_HEADER || prevAAC_Header)))
+						if ((prevAudioTS != Defines.INVALID_TIMESTAMP) && (packetTS <= prevAudioTS))
 						{
-							LogDebug(format + " Fixing audio timestamp - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
+							LogDebug(" Fixing audio timestamp - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize+"\n");
 							packetTS += (FRAMEFIX_STEP / 5) + (prevAudioTS - packetTS);
 							WriteFlvTimestamp(frag, fragPos, packetTS);
 						}
 						if (is_resource(flv))
 						{
-							pAudioTagPos = ftell(flv);
-							status             = fwrite(flv, substr(frag, fragPos, totalTagLen), totalTagLen);
+							bool status   = fwrite(flv, substr(frag, fragPos, totalTagLen), totalTagLen);
 							if (!status)
 								LogError("Failed to write flv data to file");
-							LogDebug(format + " - AUDIO - " + packetTS+" - "+prevAudioTS+" - "+packetSize+" - "+pAudioTagPos);
+							LogDebug(" - AUDIO - " + packetTS+" - "+prevAudioTS+" - "+packetSize);
 						}
 						else
 						{
 							byte[] new_flvData = new byte[flvData.Length + totalTagLen];
-							Buffer.BlockCopy(flvData, 0, concat, 0, flvData.Length);
-							Buffer.BlockCopy(frag, flvData.Length, new_flvData, fragPos, totalTagLen);
+							Buffer.BlockCopy(flvData, 0, new_flvData, 0, flvData.Length);
+							Buffer.BlockCopy(frag, flvData.Length, new_flvData, fragPos, (int)totalTagLen);
 							flvData = new_flvData;
-							LogDebug(format + "AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize));
+							LogDebug("AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
 						}
-						if ((CodecID == CODEC_ID_AAC) and (AAC_PacketType == AAC_SEQUENCE_HEADER))
+						if (CodecID == CODEC_ID_AAC && AAC_PacketType == AAC_SEQUENCE_HEADER)
 							prevAAC_Header = true;
 						else
 							prevAAC_Header = false;
 						prevAudioTS  = packetTS;
-						pAudioTagLen = totalTagLen;
+						pAudioTagLen = (int)totalTagLen;
 					}
 					else
-						LogDebug(format+" Skipping small sized audio packet - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
+						LogDebug("Skipping small sized audio packet - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
 				}
 				else
-					LogDebug(format + " Skipping audio packet in fragment "+fragNum+" - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
+					LogDebug("Skipping audio packet in fragment "+fragNum+" - AUDIO - "+packetTS+" - "+prevAudioTS+" - "+packetSize);
 				if (!audio)
 					audio = true;
 				break;
 			case VIDEO:
 				if (packetTS > prevVideoTS - fixWindow)
 				{
-					FrameInfo = ReadByte(frag, fragPos + tagHeaderLen);
-					FrameType = (FrameInfo & 0xF0) >> 4;
-					CodecID   = FrameInfo & 0x0F;
+					byte FrameInfo = frag[fragPos + tagHeaderLen];
+					int FrameType = (FrameInfo & 0xF0) >> 4;
+					int CodecID   = FrameInfo & 0x0F;
 					if (FrameType == FRAME_TYPE_INFO)
 					{
-						LogDebug(format + " Skipping video info frame - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+						LogDebug("Skipping video info frame - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 						break;
 					}
+					byte AVC_PacketType;
 					if (CodecID == CODEC_ID_AVC)
 					{
-						AVC_PacketType = ReadByte(frag, fragPos + tagHeaderLen + 1);
+						AVC_PacketType = frag[fragPos + tagHeaderLen + 1];
 						if (AVC_PacketType == AVC_SEQUENCE_HEADER)
 						{
 							if (AVC_HeaderWritten)
 							{
-								LogDebug(format + " Skipping AVC sequence header - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+								LogDebug("Skipping AVC sequence header - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 								break;
 							}
 							else
@@ -682,16 +672,16 @@ public class F4F : Functions
 						}
 						else if (!AVC_HeaderWritten)
 						{
-							LogDebug(format + "Discarding video packet received before AVC sequence header - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+							LogDebug("Discarding video packet received before AVC sequence header - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 							break;
 						}
 					}
 					if (packetSize > 0)
 					{
-						pts = packetTS;
+						long pts = (int)packetTS;
 						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_NALU)
 						{
-							int cts = ReadInt24(frag, fragPos + tagHeaderLen + 2);
+							long cts = ReadInt24(frag, fragPos + tagHeaderLen + 2);
 							cts = (cts + 0xff800000) ^ 0xff800000;
 							pts = packetTS + cts;
 							if (cts != 0)
@@ -700,37 +690,39 @@ public class F4F : Functions
 
 						// Check for packets with non-monotonic video timestamps and fix them
 						if (!(CodecID == CODEC_ID_AVC && (AVC_PacketType == AVC_SEQUENCE_HEADER || AVC_PacketType == AVC_SEQUENCE_END || prevAVC_Header)))
-						if (prevVideoTS != INVALID_TIMESTAMP && packetTS <= prevVideoTS)
+						if (prevVideoTS != Defines.INVALID_TIMESTAMP && packetTS <= prevVideoTS)
 						{
-							LogDebug(format+" Fixing video timestamp - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+							LogDebug("Fixing video timestamp - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 							packetTS += (FRAMEFIX_STEP / 5) + (prevVideoTS - packetTS);
 							WriteFlvTimestamp(frag, fragPos, packetTS);
 						}
 						if (is_resource(flv))
 						{
-							pVideoTagPos = ftell(flv);
-							status             = fwrite(flv, substr(frag, fragPos, totalTagLen), totalTagLen);
+							bool status  = fwrite(flv, substr(frag, fragPos, totalTagLen), totalTagLen);
 							if (!status)
 								LogError("Failed to write flv data to file");
-							LogDebug(format + " VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize+" - "+pVideoTagPos);
+							LogDebug("VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 						}
 						else
 						{
-							flvData += substr(frag, fragPos, totalTagLen);
-							LogDebug(format+" VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+							byte[] new_flvData = new byte[flvData.Length + totalTagLen];
+							Buffer.BlockCopy(flvData, 0, new_flvData, 0, flvData.Length);
+							Buffer.BlockCopy(frag, flvData.Length, new_flvData, fragPos, (int)totalTagLen);
+							flvData = new_flvData;
+							LogDebug("VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 						}
 						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_SEQUENCE_HEADER)
 							prevAVC_Header = true;
 						else
 							prevAVC_Header = false;
 						prevVideoTS  = packetTS;
-						pVideoTagLen = totalTagLen;
+						pVideoTagLen = (int)totalTagLen;
 					}
 					else
-						LogDebug(format+" Skipping small sized video packet - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+						LogDebug("Skipping small sized video packet - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 				}
 				else
-					LogDebug(format+" Skipping video packet in fragment "+fragNum+" - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
+					LogDebug("Skipping video packet in fragment "+fragNum+" - VIDEO - "+packetTS+" - "+prevVideoTS+" - "+packetSize);
 				if (!video)
 					video = true;
 				break;
@@ -738,21 +730,19 @@ public class F4F : Functions
 				break;
 			default:
 				if (packetType == 10 || packetType == 11)
-					LogError("This stream is encrypted with Akamai DRM. Decryption of such streams isn't currently possible with this script.", 2);
+					LogError("This stream is encrypted with Akamai DRM. Decryption of such streams isn't currently possible with this script.");
 				else if (packetType == 40 || packetType == 41)
-					LogError("This stream is encrypted with FlashAccess DRM. Decryption of such streams isn't currently possible with this script.", 2);
+					LogError("This stream is encrypted with FlashAccess DRM. Decryption of such streams isn't currently possible with this script.");
 				else
 				{
 					LogInfo("Unknown packet type " + packetType + " encountered! Unable to process fragment "+fragNum);
-					break 2;
+					//break 2;
 				}
 			}
-			fragPos += totalTagLen;
+			fragPos += (int)totalTagLen;
 		}
-		duration = round(packetTS / 1000, 0);
 		if (is_resource(flv))
 		{
-			filesize = ftell(flv) / (1024 * 1024);
 			return true;
 		}
 		else
@@ -770,18 +760,14 @@ public class F4F : Functions
 				} else {
 					outFile = JoinUrl (outDir, baseFilename + ".flv");
 				}
-				InitDecoder ();
 				DecodeFragment (frag.response, frag.id);
 				opt ["file"] = WriteFlvFile (outFile, audio, video);
 				if (metadata)
 					WriteMetadata (opt ["file"]);
-
-				InitDecoder ();
 			}
 			byte[] flvData = DecodeFragment (frag.response, frag.id);
 			if (flvData.Length != 0) {
 				fwrite (opt ["file"], flvData, flvData.Length);
-				filesize = ftell (opt ["file"]) / (1024 * 1024);
 			}
 			lastFrag = frag.id;
 		} else {
