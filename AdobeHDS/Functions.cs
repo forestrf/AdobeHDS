@@ -232,7 +232,7 @@ public class Functions : Defines
 
 		if (extension.Length >= 1)
 		{
-			outFile   = outFile.Substring(0, -extension[0].Length);
+			outFile   = outFile.Substring(0, outFile.Length -extension[0].Length);
 			return outFile;
 		}
 		return outFile;

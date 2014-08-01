@@ -364,8 +364,8 @@ public class F4F : Functions
 
 		// Extract baseFilename
 		baseFilename = media.url;
-		if (baseFilename.Substring (-1) == "/")
-			baseFilename = baseFilename.Substring (0, -1);
+		if (baseFilename[baseFilename.Length -1] == '/')
+			baseFilename = baseFilename.Substring (0, baseFilename.Length -2);
 		baseFilename = RemoveExtension (baseFilename);
 		int lastSlash = baseFilename.LastIndexOf ("/");
 		if (lastSlash != -1)
