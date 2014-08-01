@@ -131,7 +131,7 @@ public class Functions : Defines
 */
 	public string JoinUrl(string firstUrl, string secondUrl)
 	{
-		if (firstUrl != null && secondUrl != null)
+		if (firstUrl != "" && secondUrl != "")
 		{
 			if (firstUrl[firstUrl.Length-1] == '/')
 				firstUrl = firstUrl.Substring(0, -1);
@@ -139,7 +139,7 @@ public class Functions : Defines
 				secondUrl = secondUrl.Substring(1);
 			return firstUrl + "/" + secondUrl;
 		}
-		else if (firstUrl != null)
+		else if (firstUrl != "")
 			return firstUrl;
 		else
 			return secondUrl;
@@ -232,7 +232,7 @@ public class Functions : Defines
 
 		if (extension.Length >= 1)
 		{
-			outFile   = outFile.Substring(0, outFile.Length -extension[0].Length);
+			outFile = outFile.Substring(0, outFile.Length -extension[0].Length);
 			return outFile;
 		}
 		return outFile;
@@ -297,13 +297,26 @@ public class Functions : Defines
 		{
 			int metadataSize = f4f.media.metadata.Length;
 			f4f.media.metadata[0] = Defines.SCRIPT_DATA;
-			WriteToByteArray (f4f.media.metadata, 1, BitConverter.GetBytes (metadataSize));
-			WriteToByteArray (f4f.media.metadata, 4, BitConverter.GetBytes (0));
-			WriteToByteArray (f4f.media.metadata, 7, BitConverter.GetBytes (0));
+			byte[] a = new byte[11];
+			WriteToByteArray (a, 1, BitConverter.GetBytes (metadataSize));
+			WriteToByteArray (a, 4, BitConverter.GetBytes (0));
+			WriteToByteArray (a, 7, BitConverter.GetBytes (0));
+
+
+
+
+
+
+
+			byte[] res = new byte[a.Length + f4f.media.metadata.Length +4];
+
+			Buffer.BlockCopy (a, 0, res, 0, a.Length);
+			Buffer.BlockCopy (f4f.media.metadata, 0, res, a.Length, f4f.media.metadata.Length);
+			f4f.media.metadata = res;
 
 			f4f.media.metadata[f4f.tagHeaderLen + metadataSize - 1] = 0x09;
 			WriteToByteArray (f4f.media.metadata, f4f.tagHeaderLen + metadataSize, BitConverter.GetBytes (f4f.tagHeaderLen + metadataSize));
-			flv.Write(f4f.media.metadata, f4f.tagHeaderLen + metadataSize + f4f.prevTagSize, f4f.media.metadata.Length);
+			flv.Write(f4f.media.metadata, 0, f4f.media.metadata.Length);
 		}
 	}
 
