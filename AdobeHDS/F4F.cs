@@ -340,8 +340,8 @@ public class F4F : Functions
 		LogDebug ("Base Fragment Url:\n" + fragUrl + "\n");
 		LogDebug ("Downloading Fragments:\n");
 
-		bool w1 = true, w2 = true;
-		while ((fragNum <= fragCount) && w1) {
+		bool w2 = true;
+		while (fragNum <= fragCount) {
 			w2 = true;
 			Frag_response frag = new Frag_response ();
 			fragNum = fragNum++;
@@ -472,9 +472,9 @@ public class F4F : Functions
 			int currentTS = packetTS;
 			int lastTS = prevVideoTS >= prevAudioTS ? prevVideoTS : prevAudioTS;
 			int fixedTS = lastTS + FRAMEFIX_STEP;
-			if ((baseTS == INVALID_TIMESTAMP) && ((packetType == AUDIO) || (packetType == VIDEO)))
+			if (baseTS == INVALID_TIMESTAMP && (packetType == AUDIO || packetType == VIDEO))
 				baseTS = packetTS;
-			if ((baseTS > 1000) && (packetTS >= baseTS))
+			if (baseTS > 1000 && packetTS >= baseTS)
 				packetTS -= baseTS;
 			if (lastTS != INVALID_TIMESTAMP) {
 				int timeShift = packetTS - lastTS;
@@ -640,12 +640,12 @@ public class F4F : Functions
 
 	public void WriteFragment (Frag_response frag)
 	{
-		if (frag.response.Length == 0) {
+		if (frag.response.Length != 0) {
 			LogDebug ("Writing fragment " + frag.id + " to flv file");
 			if (file == null) {
 				string outFile = "";
 				if (outFileGlobal != "") {
-					outFile = JoinUrl (outDir, outFile + ".flv");
+					outFile = JoinUrl (outDir, outFileGlobal + ".flv");
 				} else {
 					outFile = JoinUrl (outDir, baseFilename + ".flv");
 				}
