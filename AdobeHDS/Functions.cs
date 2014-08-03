@@ -304,11 +304,6 @@ public class Functions : Defines
 			WriteToByteArray (a, 7, BitConverter.GetBytes (0));
 
 
-
-
-
-
-
 			byte[] res = new byte[a.Length + f4f.media.metadata.Length +4];
 
 			Buffer.BlockCopy (a, 0, res, 0, a.Length);
