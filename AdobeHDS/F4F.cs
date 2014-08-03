@@ -58,24 +58,6 @@ public class F4F : Functions
 
 	public F4F ()
 	{
-		InitDecoder ();
-	}
-
-	public void InitDecoder(){
-		audio             = false;
-		video             = false;
-		prevTagSize       = 4;
-		tagHeaderLen      = 11;
-		baseTS            = INVALID_TIMESTAMP;
-		negTS             = INVALID_TIMESTAMP;
-		prevAudioTS       = INVALID_TIMESTAMP;
-		prevVideoTS       = INVALID_TIMESTAMP;
-		pAudioTagLen      = 0;
-		pVideoTagLen      = 0;
-		prevAVC_Header    = false;
-		prevAAC_Header    = false;
-		AVC_HeaderWritten = false;
-		AAC_HeaderWritten = false;
 	}
 
 	public void ParseManifest (string manifest)
@@ -609,14 +591,11 @@ public class F4F : Functions
 				} else {
 					outFile = JoinUrl (outDir, baseFilename + ".flv");
 				}
-				InitDecoder ();
 				flvData = DecodeFragment (frag.response, frag.id);
 				file = WriteFlvFile (outFile, audio, video);
 				if (media.metadata.Length != 0) {
 					WriteMetadata (this, file);
 				}
-
-				InitDecoder ();
 			}
 			else{
 				flvData = DecodeFragment (frag.response, frag.id);
