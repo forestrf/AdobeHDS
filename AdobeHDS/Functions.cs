@@ -10,8 +10,8 @@ public class Functions : Defines
 {
 	public int ReadInt24 (byte[] bytes, int pos)
 	{
-		int res = (bytes [pos + 0] << 32) + (bytes [pos + 1] << 16) + (bytes [pos + 2] << 8);
-		return BitConverter.IsLittleEndian ? SwapInt24 (res) : res;
+		int res = BitConverter.ToInt32 (new byte[4]{0x00, bytes [pos], bytes [pos+1], bytes [pos+2]}, 0);
+		return BitConverter.IsLittleEndian ? SwapInt32 (res) : res;
 	}
 
 	public string ReadString (byte[] bytes, int start, int length)
@@ -44,11 +44,6 @@ public class Functions : Defines
 	public short SwapInt16 (short v)
 	{
 		return (short)(((v & 0xff) << 8) | ((v >> 8) & 0xff));
-	}
-
-	public int SwapInt24 (int v)
-	{
-		return ((v >> 8) & 0xff) | ((v << 16) & 0xff0000);
 	}
 
 	public int SwapInt32 (int v)
