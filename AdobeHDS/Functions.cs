@@ -10,7 +10,7 @@ public class Functions : Defines
 {
 	public int ReadInt24 (byte[] bytes, int pos)
 	{
-		int res = (bytes [pos + 0] << 16) + (bytes [pos + 1] << 8) + (bytes [pos + 2]);
+		int res = (bytes [pos + 0] << 32) + (bytes [pos + 1] << 16) + (bytes [pos + 2] << 8);
 		return BitConverter.IsLittleEndian ? SwapInt24 (res) : res;
 	}
 
@@ -81,6 +81,7 @@ public class Functions : Defines
 			boxSize = 0;
 	}
 
+	// FAAAAAAIL
 	public void WriteBoxSize(byte[] str, int pos, string type, long size)
 	{
 		if (ReadString (str, pos - 4, 4) == type) {

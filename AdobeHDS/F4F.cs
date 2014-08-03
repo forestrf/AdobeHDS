@@ -347,33 +347,6 @@ public class F4F : Functions
 			fragNum = fragNum++;
 			frag.id = fragNum;
 			LogInfo ("Downloading " + fragNum + "/" + fragCount + " fragments");
-			/*
-			if (in_array_field (fragNum, fragTable)) {
-				if (value_in_array_field (fragNum, fragTable)) {
-					discontinuity = fragNum;
-				}
-			}
-			else
-			{
-				int closest = fragTable[1].firstFragment;
-				int i = 2;
-				while (i < fragTable.Count)
-				{
-					if (fragTable[i].firstFragment < fragNum)
-						closest = fragTable[i].firstFragment;
-					else
-						break;
-					i++;
-				}
-				discontinuity = fragTable [closest].discontinuityIndicator;
-			}
-			if (discontinuity != 0)
-			{
-				LogDebug("Skipping fragment fragNum due to discontinuity, Type: " + discontinuity);
-				frag["response"] = false;
-				rename = true;
-			}
-			else */
 			frag.filename = baseFilename + fragNum;
 			if (File.Exists (frag.filename)) {
 				LogDebug ("Fragment fragNum is already downloaded");
@@ -386,22 +359,16 @@ public class F4F : Functions
 				new WebClient ().DownloadFile (url, frag.filename);
 				frag.response = file_get_contents (frag.filename);
 			}
-			if (VerifyFragment (frag.response)) {
-				LogDebug ("Fragment " + frag.filename + " successfully downloaded");
-				if (frag.response.Length != 0) {
-					WriteFragment (frag);
-					frag.response = new byte[0];
-					frags.Add (fragNum, frag);
-					fragNum++;
-				} else {
-					fragNum--;
-					File.Delete (frag.filename);
-					LogDebug ("Fragment " + frag.id + " bad downloaded");
-				}
+			LogDebug ("Fragment " + frag.filename + " successfully downloaded");
+			if (frag.response.Length != 0) {
+				WriteFragment (frag);
+				frag.response = new byte[0];
+				frags.Add (fragNum, frag);
+				fragNum++;
 			} else {
 				fragNum--;
 				File.Delete (frag.filename);
-				LogDebug ("Fragment " + frag.id + " failed to verify");
+				LogDebug ("Fragment " + frag.id + " bad downloaded");
 			}
 		}
 
@@ -410,42 +377,12 @@ public class F4F : Functions
 		processed = true;
 	}
 
-	public bool VerifyFragment (byte[] frag)
-	{
-		int fragPos = 0;
-		int fragLen = frag.Length;
-
-		//Some moronic servers add wrong boxSize in header causing fragment verification to fail so we have to fix the boxSize before processing the fragment.          
-		while (fragPos < fragLen) {
-			string boxType = "";
-			long boxSize = 0;
-			ReadBoxHeader (frag, ref fragPos, ref boxType, ref boxSize);
-			if (boxType == "mdat") {
-				long len = boxSize - fragPos;
-				if (boxSize != 0 && len == boxSize)
-					return true;
-				else {
-					boxSize = fragLen - fragPos;
-					WriteBoxSize (frag, fragPos, boxType, boxSize);
-					return true;
-				}
-			}
-			fragPos += (int)boxSize;
-		}
-		return false;
-	}
-
 	public byte[] DecodeFragment (byte[] frag, int fragNum)
 	{
 		byte[] flvData = new byte[0];
 		int fragPos = 0;
 		int packetTS = 0;
 		long fragLen = frag.LongLength;
-
-		if (!VerifyFragment (frag)) {
-			LogInfo ("Skipping fragment number " + fragNum);
-			return new byte[0];
-		}
 
 		while (fragPos < fragLen) {
 			long boxSize = 0;
