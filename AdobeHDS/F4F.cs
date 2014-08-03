@@ -58,6 +58,24 @@ public class F4F : Functions
 
 	public F4F ()
 	{
+		InitDecoder ();
+	}
+
+	public void InitDecoder(){
+		audio             = false;
+		video             = false;
+		prevTagSize       = 4;
+		tagHeaderLen      = 11;
+		baseTS            = INVALID_TIMESTAMP;
+		negTS             = INVALID_TIMESTAMP;
+		prevAudioTS       = INVALID_TIMESTAMP;
+		prevVideoTS       = INVALID_TIMESTAMP;
+		pAudioTagLen      = 0;
+		pVideoTagLen      = 0;
+		prevAVC_Header    = false;
+		prevAAC_Header    = false;
+		AVC_HeaderWritten = false;
+		AAC_HeaderWritten = false;
 	}
 
 	public void ParseManifest (string manifest)
@@ -397,10 +415,8 @@ public class F4F : Functions
 
 		LogDebug ("\nFragment " + fragNum + ":\nType - CurrentTS - PreviousTS - Size - Position");
 		while (fragPos < fragLen) {
-			LogInfo("fragPos = "+fragPos);
 			byte packetType = frag [fragPos];
 			int packetSize = ReadInt24 (frag, fragPos + 1);
-			LogInfo("packetSize = "+packetSize);
 			packetTS = ReadInt24 (frag, fragPos + 4);
 			packetTS = packetTS | (frag [fragPos + 7] << 24);
 			if ((packetTS & 0x80000000) != 0)
@@ -444,8 +460,6 @@ public class F4F : Functions
 				}
 			}
 
-			LogInfo("packetTS = "+packetTS+", lastTS = "+lastTS);
-
 			switch (packetType) {
 			case AUDIO:
 				if (packetTS > prevAudioTS - fixWindow) {
@@ -471,11 +485,6 @@ public class F4F : Functions
 					if (packetSize > 0) {
 						// Check for packets with non-monotonic audio timestamps and fix them
 
-						LogInfo("\n"+fragPos+"\n"+packetType);
-						LogInfo("CodecID = "+CodecID+"; AAC_PacketType = "+AAC_PacketType+"; this->prevAAC_Header = "+prevAAC_Header);
-						LogInfo("this->prevAudioTS = "+prevAudioTS+"; packetTS = "+packetTS+"; this->prevAudioTS = "+prevAudioTS+"\n");
-
-
 						if (!(CodecID == CODEC_ID_AAC && (AAC_PacketType == AAC_SEQUENCE_HEADER || prevAAC_Header))) {
 							if ((prevAudioTS != INVALID_TIMESTAMP) && (packetTS <= prevAudioTS)) {
 								LogDebug (" Fixing audio timestamp - AUDIO - " + packetTS + " - " + prevAudioTS + " - " + packetSize + "\n");
@@ -483,10 +492,13 @@ public class F4F : Functions
 								WriteFlvTimestamp (frag, fragPos, packetTS);
 							}
 						}
-						byte[] new_flvData = new byte[flvData.Length + frag.Length];
+
+						byte[] new_flvData = new byte[flvData.Length + totalTagLen];
 						Buffer.BlockCopy (flvData, 0, new_flvData, 0, flvData.Length);
-						Buffer.BlockCopy (frag, 0, new_flvData, flvData.Length, frag.Length);
+						Buffer.BlockCopy (frag, fragPos, new_flvData, flvData.Length, (int)totalTagLen);
 						flvData = new_flvData;
+						new_flvData = null;
+
 						LogDebug ("AUDIO - " + packetTS + " - " + prevAudioTS + " - " + packetSize);
 								
 						if (CodecID == CODEC_ID_AAC && AAC_PacketType == AAC_SEQUENCE_HEADER)
@@ -544,15 +556,20 @@ public class F4F : Functions
 							packetTS += (FRAMEFIX_STEP / 5) + (prevVideoTS - packetTS);
 							WriteFlvTimestamp (frag, fragPos, packetTS);
 						}
-								
-						flvData = frag;
+
+						byte[] new_flvData = new byte[flvData.Length + totalTagLen];
+
+						Buffer.BlockCopy (flvData, 0, new_flvData, 0, flvData.Length);
+						Buffer.BlockCopy (frag, fragPos, new_flvData, flvData.Length, (int)totalTagLen);
+
+						flvData = new_flvData;
+
 						LogDebug ("VIDEO - " + packetTS + " - " + prevVideoTS + " - " + packetSize);
 
 						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_SEQUENCE_HEADER)
 							prevAVC_Header = true;
 						else
 							prevAVC_Header = false;
-						LogInfo("$packetTS = "+packetTS);
 						prevVideoTS = packetTS;
 						pVideoTagLen = totalTagLen;
 					} else
@@ -584,6 +601,7 @@ public class F4F : Functions
 	{
 		if (frag.response.Length != 0) {
 			LogDebug ("Writing fragment " + frag.id + " to flv file");
+			byte[] flvData;
 			if (file == null) {
 				string outFile = "";
 				if (outFileGlobal != "") {
@@ -591,12 +609,18 @@ public class F4F : Functions
 				} else {
 					outFile = JoinUrl (outDir, baseFilename + ".flv");
 				}
-				DecodeFragment (frag.response, frag.id);
+				InitDecoder ();
+				flvData = DecodeFragment (frag.response, frag.id);
 				file = WriteFlvFile (outFile, audio, video);
-				if (media.metadata.Length != 0)
+				if (media.metadata.Length != 0) {
 					WriteMetadata (this, file);
+				}
+
+				InitDecoder ();
 			}
-			byte[] flvData = DecodeFragment (frag.response, frag.id);
+			else{
+				flvData = DecodeFragment (frag.response, frag.id);
+			}
 			if (flvData.Length != 0) {
 				file.Write (flvData, 0, flvData.Length);
 			}

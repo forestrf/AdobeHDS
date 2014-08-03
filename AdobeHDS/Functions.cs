@@ -186,25 +186,7 @@ public class Functions : Defines
 			outPath += "/";
 		return outPath;
 	}
-	/*
-	public void PrintLine(string msg)
-	{
-		PrintLine(msg, false)
-	}
-	public void PrintLine(string msg, bool progress)
-	{
-		if (msg)
-		{
-			Console.WriteLine("\r%-79s\r", "");
-			if (progress)
-				Console.WriteLine("%s\r", msg);
-			else
-				Console.WriteLine("%s\n", msg);
-		}
-		else
-			Console.WriteLine("\n");
-	}
-*/
+
 	public string CalculateMD5Hash(string input)
 	{
 		// step 1, calculate MD5 hash from input
@@ -287,15 +269,20 @@ public class Functions : Defines
 		return file;
 	}
 
+	public void WriteInt24(byte[] bytes, int pos, int number){
+		byte[] n = BitConverter.GetBytes (number);
+		WriteToByteArray (bytes, pos, new byte[]{n[0], n[1], n[2]});
+	}
+
 	public void WriteMetadata(F4F f4f, FileStream flv)
 	{
 		if (f4f.media.metadata.Length != 0)
 		{
 			int metadataSize = f4f.media.metadata.Length;
-			f4f.media.metadata[0] = Defines.SCRIPT_DATA;
 			byte[] a = new byte[11];
-			WriteToByteArray (a, 1, BitConverter.GetBytes (metadataSize));
-			WriteToByteArray (a, 4, BitConverter.GetBytes (0));
+			a[0] = Defines.SCRIPT_DATA;
+			WriteInt24 (a, 1, metadataSize);
+			WriteInt24 (a, 4, 0);
 			WriteToByteArray (a, 7, BitConverter.GetBytes (0));
 
 
