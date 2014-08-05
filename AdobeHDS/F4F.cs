@@ -34,7 +34,7 @@ public class F4F : Functions
 	public Manifest_parsed_media media;
 	public SegTable_content segTable;
 	public Dictionary<int,Frag_table_content> fragTable;
-	public Dictionary<int, Frag_response> frags = new Dictionary<int, Frag_response> ();
+	public List<Frag_response> frags = new List<Frag_response> ();
 	public FileStream file;
 
 
@@ -367,8 +367,11 @@ public class F4F : Functions
 			if (frag.response.Length != 0) {
 				WriteFragment (frag);
 				frag.response = new byte[0];
-				frags.Add (fragNum, frag);
+				frags.Add (frag);
 				fragNum++;
+				if (delete_fragments_at_end) {
+					File.Delete (frag.filename);
+				}
 			} else {
 				fragNum--;
 				File.Delete (frag.filename);
@@ -380,8 +383,10 @@ public class F4F : Functions
 		LogDebug ("\nAll fragments downloaded successfully\n");
 
 		if (delete_fragments_at_end) {
-			for (int i = fragTable [1].firstFragment; i <= fragCount; i++) {
-				File.Delete (baseFilename + fragNum);
+			foreach (Frag_response frag in frags) {
+				if (File.Exists (frag.filename)) {
+					File.Delete (frag.filename);
+				}
 			}
 		}
 
