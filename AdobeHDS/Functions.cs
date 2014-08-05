@@ -8,6 +8,9 @@ using System.Security.Cryptography;
 
 public class Functions : Defines
 {
+	public bool debug = false;
+
+
 	public int ReadInt24 (byte[] bytes, int pos)
 	{
 		int res = BitConverter.ToInt32 (new byte[4]{ 0x00, bytes [pos], bytes [pos + 1], bytes [pos + 2] }, 0);
@@ -139,7 +142,11 @@ public class Functions : Defines
 
 	public void LogDebug (string msg)
 	{
-		Debug.WriteLine ("DEBUG: " + msg);
+		if (debug) {
+			LogInfo ("DEBUG: " + msg);
+		} else {
+			Debug.WriteLine ("DEBUG: " + msg);
+		}
 	}
 
 	public void LogError (string msg)

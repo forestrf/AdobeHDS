@@ -40,6 +40,10 @@ namespace AdobeHDS
 
 			Args_parser args_parser = new Args_parser (args);
 
+			if (args_parser.args.Count == 0) {
+				return;
+			}
+
 			if (args_parser.args.ContainsKey ("help")) {
 				// Show help
 				foreach (KeyValuePair<string, string> option in options[0]) {
@@ -51,10 +55,10 @@ namespace AdobeHDS
 				return;
 			}
 
+			F4F f4f = new F4F ();
 
 			string manifest = null;
 			string baseFilename = null;
-			bool debug = false;
 			int fixWindow = 0;
 			string metadata = null;
 			string outDir = null;
@@ -65,17 +69,11 @@ namespace AdobeHDS
 			}
 
 			if (args_parser.args.ContainsKey ("debug")) {
-				switch (args_parser.args ["debug"]) {
-				case "1":
-					debug = true;
-					break;
-				case "true":
-					debug = true;
-					break;
-				default:
-					debug = false;
-					break;
-				}
+				f4f.debug = true;
+			}
+
+			if (args_parser.args.ContainsKey ("delete")) {
+				f4f.delete_fragments_at_end = true;
 			}
 
 
@@ -96,7 +94,9 @@ namespace AdobeHDS
 
 
 
-			F4F f4f = new F4F ();
+
+
+
 			f4f.DownloadFragments (manifest);
 		}
 	}
