@@ -346,9 +346,7 @@ public class F4F : Functions
 		LogDebug ("Base Fragment Url:\n" + fragUrl + "\n");
 		LogDebug ("Downloading Fragments:\n");
 
-		bool w2 = true;
 		while (fragNum <= fragCount) {
-			w2 = true;
 			Frag_response frag = new Frag_response ();
 			fragNum = fragNum++;
 			frag.id = fragNum;
@@ -380,6 +378,13 @@ public class F4F : Functions
 
 		LogInfo ("");
 		LogDebug ("\nAll fragments downloaded successfully\n");
+
+		if (delete_fragments_at_end) {
+			for (int i = fragTable [1].firstFragment; i <= fragCount; i++) {
+				File.Delete (baseFilename + fragNum);
+			}
+		}
+
 		processed = true;
 	}
 
