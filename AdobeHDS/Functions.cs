@@ -233,29 +233,6 @@ public class Functions : Defines
 		WriteToByteArray (bytes, pos, new byte[]{ n [0], n [1], n [2] });
 	}
 
-	public void WriteMetadata (F4F f4f, FileStream flv)
-	{
-		if (f4f.media.metadata.Length != 0) {
-			int metadataSize = f4f.media.metadata.Length;
-			byte[] a = new byte[11];
-			a [0] = Defines.SCRIPT_DATA;
-			WriteInt24 (a, 1, metadataSize);
-			WriteInt24 (a, 4, 0);
-			WriteToByteArray (a, 7, BitConverter.GetBytes (0));
-
-
-			byte[] res = new byte[a.Length + f4f.media.metadata.Length + 4];
-
-			Buffer.BlockCopy (a, 0, res, 0, a.Length);
-			Buffer.BlockCopy (f4f.media.metadata, 0, res, a.Length, f4f.media.metadata.Length);
-			f4f.media.metadata = res;
-
-			f4f.media.metadata [f4f.tagHeaderLen + metadataSize - 1] = 0x09;
-			WriteToByteArray (f4f.media.metadata, f4f.tagHeaderLen + metadataSize, BitConverter.GetBytes (f4f.tagHeaderLen + metadataSize));
-			flv.Write (f4f.media.metadata, 0, f4f.media.metadata.Length);
-		}
-	}
-
 	public bool in_array_field (int needle, Dictionary<int, Frag_table_content> haystack)
 	{
 		foreach (KeyValuePair<int, Frag_table_content> item in haystack) {

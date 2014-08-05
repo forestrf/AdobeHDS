@@ -622,7 +622,7 @@ public class F4F : Functions
 				flvData = DecodeFragment (frag.response, frag.id);
 				file = WriteFlvFile (outFile, audio, video);
 				if (media.metadata.Length != 0) {
-					WriteMetadata (this, file);
+					WriteMetadata (file);
 				}
 			} else {
 				flvData = DecodeFragment (frag.response, frag.id);
@@ -634,6 +634,29 @@ public class F4F : Functions
 		} else {
 			lastFrag += 1;
 			LogDebug ("Skipping failed fragment " + lastFrag);
+		}
+	}
+
+	public void WriteMetadata (FileStream flv)
+	{
+		if (media.metadata.Length != 0) {
+			int metadataSize = media.metadata.Length;
+			byte[] a = new byte[11];
+			a [0] = SCRIPT_DATA;
+			WriteInt24 (a, 1, metadataSize);
+			WriteInt24 (a, 4, 0);
+			WriteToByteArray (a, 7, BitConverter.GetBytes (0));
+
+
+			byte[] res = new byte[a.Length + media.metadata.Length + 4];
+
+			Buffer.BlockCopy (a, 0, res, 0, a.Length);
+			Buffer.BlockCopy (media.metadata, 0, res, a.Length, media.metadata.Length);
+			media.metadata = res;
+
+			media.metadata [tagHeaderLen + metadataSize - 1] = 0x09;
+			WriteToByteArray (media.metadata, tagHeaderLen + metadataSize, BitConverter.GetBytes (tagHeaderLen + metadataSize));
+			flv.Write (media.metadata, 0, media.metadata.Length);
 		}
 	}
 }
