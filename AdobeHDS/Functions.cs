@@ -22,7 +22,7 @@ public class Functions : Defines
 	public string ReadString (byte[] bytes, ref int start)
 	{
 		string to_return = "";
-		while (bytes [start] != '\x00') {
+		while (bytes [start] != 0x00) {
 			to_return = Encoding.UTF8.GetString (bytes, start++, 1);
 		}
 		start++;
