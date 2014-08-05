@@ -8,53 +8,36 @@ using System.IO;
 
 public class F4F : Functions
 {
-	public string baseUrl, baseFilename;
+	public int fragCount = -1,
+		lastFrag = 0,
+		fixWindow = 1000,
+		prevAudioTS = INVALID_TIMESTAMP,
+		prevVideoTS = INVALID_TIMESTAMP,
+		baseTS = INVALID_TIMESTAMP,
+		negTS = INVALID_TIMESTAMP,
+		prevTagSize = 4,
+		tagHeaderLen = 11;
+	public string baseUrl,
+		baseFilename,
+		outFileGlobal = "",
+		outDir = "";
+	public bool processed = false,
+		audio = false,
+		video = false,
+		prevAVC_Header = false,
+		prevAAC_Header = false,
+		AVC_HeaderWritten = false,
+		AAC_HeaderWritten = false;
 	public byte[] bootstrapInfo;
 	public Manifest_parsed_media media;
 	public SegTable_content segTable;
 	public Dictionary<int,Frag_table_content> fragTable;
-	public int fragCount = -1;
-
 	public Dictionary<int, Frag_response> frags = new Dictionary<int, Frag_response> ();
-
-	public string outFileGlobal = "";
-
-	public string outDir = "";
-
-	public int lastFrag = 0;
-
-	public bool processed = false;
-
 	public FileStream file;
 
 
+	public string auth = ""; // Reimplement
 
-
-
-
-
-
-
-
-	public int discontinuity = 0;
-	public int fixWindow = 1000;
-	public int prevAudioTS = INVALID_TIMESTAMP;
-	public int prevVideoTS = INVALID_TIMESTAMP;
-	public int baseTS = INVALID_TIMESTAMP;
-	public int negTS = INVALID_TIMESTAMP;
-
-	public bool audio = false;
-	public bool video = false;
-	public int prevTagSize = 4;
-	public int tagHeaderLen = 11;
-	public long pAudioTagLen = 0;
-	public long pVideoTagLen = 0;
-	public bool prevAVC_Header = false;
-	public bool prevAAC_Header = false;
-	public bool AVC_HeaderWritten = false;
-	public bool AAC_HeaderWritten = false;
-
-	public string auth = "";
 
 	public F4F ()
 	{
@@ -112,7 +95,7 @@ public class F4F : Functions
 			manifest_parsed_media.baseUrl = baseUrl;
 			manifest_parsed_media.url = node.Attributes ["url"].InnerText;
 
-			if (manifest_parsed_media.baseUrl.IndexOf ("rtmp") == 0 || manifest_parsed_media.url.IndexOf ("rtmp") == 0) {
+			if (isRtmpUrl (manifest_parsed_media.baseUrl) || isRtmpUrl (manifest_parsed_media.url)) {
 				LogError ("Provided manifest is not a valid HDS manifest");
 				return;
 			}
@@ -244,16 +227,18 @@ public class F4F : Functions
 		int flags = ReadInt24 (asrt, pos + 1);
 		byte qualityEntryCount = asrt [pos + 4];
 		pos += 5;
-		for (int i = 0; i < qualityEntryCount; i++)
+		for (int i = 0; i < qualityEntryCount; i++) {
 			ReadString (asrt, ref pos);
+		}
 		int segCount = ReadInt32 (asrt, pos);
 		pos += 4;
 		LogDebug ("Number - Fragments");
 		for (int i = 0; i < segCount; i++) {
 			int firstSegment = ReadInt32 (asrt, pos);
 			segTable = new SegTable_content (firstSegment, ReadInt32 (asrt, pos + 4));
-			if ((segTable.fragmentsPerSegment & 0x80000000) != 0)
+			if ((segTable.fragmentsPerSegment & 0x80000000) != 0) {
 				segTable.fragmentsPerSegment = 0;
+			}
 			pos += 8;
 		}
 
@@ -279,8 +264,9 @@ public class F4F : Functions
 			int firstFragment = ReadInt32 (afrt, pos);
 			fragTable [firstFragment] = new Frag_table_content (firstFragment, ReadInt64 (afrt, pos + 4), ReadInt32 (afrt, pos + 12), new byte ());
 			pos += 16;
-			if (fragTable [firstFragment].fragmentDuration == 0)
+			if (fragTable [firstFragment].fragmentDuration == 0) {
 				fragTable [firstFragment].discontinuityIndicator = afrt [pos++];
+			}
 		}
 		foreach (KeyValuePair<int, Frag_table_content> fragEntry in fragTable) {
 			LogDebug (fragEntry.Value.firstFragment + " - " + fragEntry.Value.firstFragmentTimestamp + " - " + fragEntry.Value.fragmentDuration + " - " + fragEntry.Value.discontinuityIndicator);
@@ -297,16 +283,19 @@ public class F4F : Functions
 			fragCount += fragTable [1].firstFragment - 1;
 		}
 
-		if (fragCount < fragTable [fragTable.Count].firstFragment)
+		if (fragCount < fragTable [fragTable.Count].firstFragment) {
 			fragCount = fragTable [fragTable.Count].firstFragment;
+		}
 
 		// Determine starting segment and fragment
-		if (segTable.firstSegment < 1)
+		if (segTable.firstSegment < 1) {
 			segTable.firstSegment = 1;
+		}
 
 		int fragStart = fragTable [1].firstFragment - 1;
-		if (fragStart < 0)
+		if (fragStart < 0) {
 			segTable.firstSegment = 1;
+		}
 	}
 
 	public void DownloadFragments (string manifest)
@@ -321,20 +310,24 @@ public class F4F : Functions
 
 		// Extract baseFilename
 		baseFilename = media.url;
-		if (baseFilename [baseFilename.Length - 1] == '/')
+		if (baseFilename [baseFilename.Length - 1] == '/') {
 			baseFilename = baseFilename.Substring (0, baseFilename.Length - 2);
+		}
 		baseFilename = RemoveExtension (baseFilename);
 		int lastSlash = baseFilename.LastIndexOf ("/");
-		if (lastSlash != -1)
+		if (lastSlash != -1) {
 			baseFilename = baseFilename.Substring (lastSlash + 1);
-		if (manifest.IndexOf ("?") != -1)
+		}
+		if (manifest.IndexOf ("?") != -1) {
 			baseFilename = CalculateMD5Hash (manifest.Substring (0, manifest.IndexOf ("?"))) + "_" + baseFilename;
-		else
+		} else {
 			baseFilename = CalculateMD5Hash (manifest) + "_" + baseFilename;
+		}
 		baseFilename += "Seg" + segNum + "-Frag";
 
-		if (fragNum >= fragCount)
+		if (fragNum >= fragCount) {
 			LogError ("No fragment available for downloading");
+		}
 
 		string fragUrl = AbsoluteUrl (baseUrl, media.url);
 		LogDebug ("Base Fragment Url:\n" + fragUrl + "\n");
@@ -401,38 +394,43 @@ public class F4F : Functions
 			int packetSize = ReadInt24 (frag, fragPos + 1);
 			packetTS = ReadInt24 (frag, fragPos + 4);
 			packetTS = packetTS | (frag [fragPos + 7] << 24);
-			if ((packetTS & 0x80000000) != 0)
+			if ((packetTS & 0x80000000) != 0) {
 				packetTS &= 0x7FFFFFFF;
+			}
 			long totalTagLen = tagHeaderLen + packetSize + prevTagSize;
 
 			int lastTS = prevVideoTS >= prevAudioTS ? prevVideoTS : prevAudioTS;
 			int fixedTS = lastTS + FRAMEFIX_STEP;
-			if (baseTS == INVALID_TIMESTAMP && (packetType == AUDIO || packetType == VIDEO))
+			if (baseTS == INVALID_TIMESTAMP && (packetType == AUDIO || packetType == VIDEO)) {
 				baseTS = packetTS;
-			if (baseTS > 1000 && packetTS >= baseTS)
+			}
+			if (baseTS > 1000 && packetTS >= baseTS) {
 				packetTS -= baseTS;
+			}
 			if (lastTS != INVALID_TIMESTAMP) {
 				int timeShift = packetTS - lastTS;
 				if (timeShift > fixWindow) {
 					LogDebug ("Timestamp gap detected: PacketTS=" + packetTS + " LastTS=" + lastTS + " Timeshift=" + timeShift);
-					if (baseTS < packetTS)
+					if (baseTS < packetTS) {
 						baseTS += timeShift - FRAMEFIX_STEP;
-					else
+					} else {
 						baseTS = timeShift - FRAMEFIX_STEP;
+					}
 					packetTS = fixedTS;
 				} else {
 					lastTS = packetType == VIDEO ? prevVideoTS : prevAudioTS;
 					if (packetTS < (lastTS - fixWindow)) {
-						if ((negTS != INVALID_TIMESTAMP) && ((packetTS + negTS) < (lastTS - fixWindow)))
+						if ((negTS != INVALID_TIMESTAMP) && ((packetTS + negTS) < (lastTS - fixWindow))) {
 							negTS = INVALID_TIMESTAMP;
+						}
 						if (negTS == INVALID_TIMESTAMP) {
 							negTS = fixedTS - packetTS;
 							LogDebug ("Negative timestamp detected: PacketTS=" + packetTS + " LastTS=" + lastTS + " NegativeTS=" + negTS);
 							packetTS = fixedTS;
 						} else {
-							if ((packetTS + negTS) <= (lastTS + fixWindow))
+							if ((packetTS + negTS) <= (lastTS + fixWindow)) {
 								packetTS += negTS;
-							else {
+							} else {
 								negTS = fixedTS - packetTS;
 								LogDebug ("Negative timestamp override: PacketTS=" + packetTS + " LastTS=" + lastTS + " NegativeTS=" + negTS);
 								packetTS = fixedTS;
@@ -483,18 +481,21 @@ public class F4F : Functions
 
 						LogDebug ("AUDIO - " + packetTS + " - " + prevAudioTS + " - " + packetSize);
 								
-						if (CodecID == CODEC_ID_AAC && AAC_PacketType == AAC_SEQUENCE_HEADER)
+						if (CodecID == CODEC_ID_AAC && AAC_PacketType == AAC_SEQUENCE_HEADER) {
 							prevAAC_Header = true;
-						else
+						} else {
 							prevAAC_Header = false;
+						}
 						prevAudioTS = packetTS;
-						pAudioTagLen = totalTagLen;
-					} else
+					} else {
 						LogDebug ("Skipping small sized audio packet - AUDIO - " + packetTS + " - " + prevAudioTS + " - " + packetSize);
-				} else
+					}
+				} else {
 					LogDebug ("Skipping audio packet in fragment " + fragNum + " - AUDIO - " + packetTS + " - " + prevAudioTS + " - " + packetSize);
-				if (!audio)
+				}
+				if (!audio) {
 					audio = true;
+				}
 				break;
 			case VIDEO:
 				if (packetTS > prevVideoTS - fixWindow) {
@@ -527,8 +528,9 @@ public class F4F : Functions
 							long cts = ReadInt24 (frag, fragPos + tagHeaderLen + 2);
 							cts = (cts + 0xff800000) ^ 0xff800000;
 							pts = packetTS + cts;
-							if (cts != 0)
+							if (cts != 0) {
 								LogDebug ("DTS: $packetTS CTS: " + cts + " PTS: " + pts);
+							}
 						}
 
 						// Check for packets with non-monotonic video timestamps and fix them
@@ -548,27 +550,30 @@ public class F4F : Functions
 
 						LogDebug ("VIDEO - " + packetTS + " - " + prevVideoTS + " - " + packetSize);
 
-						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_SEQUENCE_HEADER)
+						if (CodecID == CODEC_ID_AVC && AVC_PacketType == AVC_SEQUENCE_HEADER) {
 							prevAVC_Header = true;
-						else
+						} else {
 							prevAVC_Header = false;
+						}
 						prevVideoTS = packetTS;
-						pVideoTagLen = totalTagLen;
-					} else
+					} else {
 						LogDebug ("Skipping small sized video packet - VIDEO - " + packetTS + " - " + prevVideoTS + " - " + packetSize);
-				} else
+					}
+				} else {
 					LogDebug ("Skipping video packet in fragment " + fragNum + " - VIDEO - " + packetTS + " - " + prevVideoTS + " - " + packetSize);
-				if (!video)
+				}
+				if (!video) {
 					video = true;
+				}
 				break;
 			case SCRIPT_DATA:
 				break;
 			default:
-				if (packetType == 10 || packetType == 11)
+				if (packetType == 10 || packetType == 11) {
 					LogError ("This stream is encrypted with Akamai DRM. Decryption of such streams isn't currently possible with this script.");
-				else if (packetType == 40 || packetType == 41)
+				} else if (packetType == 40 || packetType == 41) {
 					LogError ("This stream is encrypted with FlashAccess DRM. Decryption of such streams isn't currently possible with this script.");
-				else {
+				} else {
 					LogInfo ("Unknown packet type " + packetType + " encountered! Unable to process fragment " + fragNum);
 					break;
 				}
@@ -586,7 +591,7 @@ public class F4F : Functions
 			byte[] flvData;
 			if (file == null) {
 				string outFile = "";
-				if (outFileGlobal != "") {
+				if (outFileGlobal.Length > 0) {
 					outFile = JoinUrl (outDir, outFileGlobal + ".flv");
 				} else {
 					outFile = JoinUrl (outDir, baseFilename + ".flv");
@@ -596,8 +601,7 @@ public class F4F : Functions
 				if (media.metadata.Length != 0) {
 					WriteMetadata (this, file);
 				}
-			}
-			else{
+			} else {
 				flvData = DecodeFragment (frag.response, frag.id);
 			}
 			if (flvData.Length != 0) {
@@ -608,7 +612,6 @@ public class F4F : Functions
 			lastFrag += 1;
 			LogDebug ("Skipping failed fragment " + lastFrag);
 		}
-		//unset (frags [lastFrag]);
 	}
 }
 
