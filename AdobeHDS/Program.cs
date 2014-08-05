@@ -55,7 +55,7 @@ namespace AdobeHDS
 			string manifest = null;
 			string baseFilename = null;
 			bool debug = false;
-			int fixWindow = null;
+			int fixWindow = 0;
 			string metadata = null;
 			string outDir = null;
 			string outFile = null;
@@ -74,6 +74,7 @@ namespace AdobeHDS
 					break;
 				default:
 					debug = false;
+					break;
 				}
 			}
 
