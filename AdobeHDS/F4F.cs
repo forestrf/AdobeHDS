@@ -31,7 +31,8 @@ public class F4F : Functions
 		AAC_HeaderWritten = false,
 		delete_fragments_at_end = false,
 		manifest_parsed = false,
-		fragments_proxy = false;
+		fragments_proxy = false,
+		error = false;
 	public byte[] bootstrapInfo;
 	public Manifest_parsed_media media;
 	public SegTable_content segTable;
@@ -409,6 +410,11 @@ public class F4F : Functions
 			LogDebug ("Fragment " + frag.filename + " successfully downloaded");
 			if (frag.response.Length != 0) {
 				WriteFragment (frag);
+				if (error) {
+					LogError ("An error ocurred");
+					File.Delete (frag.filename);
+					return;
+				}
 				frag.response = new byte[0];
 				frags.Add (frag);
 				fragNum++;
@@ -455,7 +461,7 @@ public class F4F : Functions
 		}
 
 		LogDebug ("\nFragment " + fragNum + ":\nType - CurrentTS - PreviousTS - Size - Position");
-		while (fragPos < fragLen) {
+		while (fragPos < fragLen && !error) {
 			byte packetType = frag [fragPos];
 			int packetSize = ReadInt24 (frag, fragPos + 1);
 			packetTS = ReadInt24 (frag, fragPos + 4);
@@ -640,8 +646,8 @@ public class F4F : Functions
 					LogError ("This stream is encrypted with FlashAccess DRM. Decryption of such streams isn't currently possible with this script.");
 				} else {
 					LogInfo ("Unknown packet type " + packetType + " encountered! Unable to process fragment " + fragNum);
-					break;
 				}
+				error = true;
 				break;
 			}
 			fragPos += (int)totalTagLen;
@@ -662,6 +668,10 @@ public class F4F : Functions
 					outFile = JoinUrl (outDir, baseFilename + ".flv");
 				}
 				flvData = DecodeFragment (frag.response, frag.id);
+				if (error) {
+					LogError ("An error ocurred");
+					return;
+				}
 				file = WriteFlvFile (outFile, audio, video);
 				if (media.metadata != null) {
 					if (media.metadata.Length != 0) {
@@ -670,6 +680,10 @@ public class F4F : Functions
 				}
 			} else {
 				flvData = DecodeFragment (frag.response, frag.id);
+				if (error) {
+					LogError ("An error ocurred");
+					return;
+				}
 			}
 			if (flvData.Length != 0) {
 				file.Write (flvData, 0, flvData.Length);
