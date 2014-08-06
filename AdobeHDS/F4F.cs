@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Xml;
 using System.Net;
-using System.Diagnostics;
 using System.IO;
 
 
@@ -20,7 +19,8 @@ public class F4F : Functions
 	public string baseUrl,
 		baseFilename,
 		outFileGlobal = "",
-		outDir = "";
+		outDir = "",
+		proxy = "";
 	public bool processed = false,
 		audio = false,
 		video = false,
@@ -29,13 +29,15 @@ public class F4F : Functions
 		AVC_HeaderWritten = false,
 		AAC_HeaderWritten = false,
 		delete_fragments_at_end = false,
-		manifest_parsed = false;
+		manifest_parsed = false,
+		fragments_proxy = false;
 	public byte[] bootstrapInfo;
 	public Manifest_parsed_media media;
 	public SegTable_content segTable;
 	public Dictionary<int,Frag_table_content> fragTable;
 	public List<Frag_response> frags = new List<Frag_response> ();
 	public FileStream file;
+	WebClient webClientFragments = new WebClient();
 
 
 	public string auth = ""; // Reimplement
@@ -56,7 +58,11 @@ public class F4F : Functions
 
 		XmlDocument doc = new XmlDocument ();
 		try {
-			string manifest_xml = new WebClient().DownloadString(manifest);
+			WebClient webClientManifest = new WebClient();
+			if(proxy.Length > 0){
+				webClientManifest.Proxy = new WebProxy(proxy);
+			}
+			string manifest_xml = webClientManifest.DownloadString(manifest);
 
 			// Remove annoying manifests
 			int nm_i = manifest_xml.IndexOf ("xmlns");
@@ -346,6 +352,10 @@ public class F4F : Functions
 		LogDebug ("Base Fragment Url:\n" + fragUrl + "\n");
 		LogDebug ("Downloading Fragments:\n");
 
+		if(proxy.Length > 0 && fragments_proxy){
+			webClientFragments.Proxy = new WebProxy(proxy);
+		}
+
 		while (fragNum <= fragCount) {
 			Frag_response frag = new Frag_response ();
 			fragNum = fragNum++;
@@ -360,7 +370,9 @@ public class F4F : Functions
 				segNum = segTable.firstSegment;
 				string url = fragUrl + "Seg" + segNum + "-Frag" + fragNum + media.queryString;
 				LogDebug ("Frag to download: " + url);
-				new WebClient ().DownloadFile (url, frag.filename);
+
+				webClientFragments.DownloadFile (url, frag.filename);
+
 				frag.response = file_get_contents (frag.filename);
 			}
 			LogDebug ("Fragment " + frag.filename + " successfully downloaded");
@@ -487,7 +499,6 @@ public class F4F : Functions
 					}
 					if (packetSize > 0) {
 						// Check for packets with non-monotonic audio timestamps and fix them
-
 						if (!(CodecID == CODEC_ID_AAC && (AAC_PacketType == AAC_SEQUENCE_HEADER || prevAAC_Header))) {
 							if ((prevAudioTS != INVALID_TIMESTAMP) && (packetTS <= prevAudioTS)) {
 								LogDebug (" Fixing audio timestamp - AUDIO - " + packetTS + " - " + prevAudioTS + " - " + packetSize + "\n");

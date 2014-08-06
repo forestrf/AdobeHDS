@@ -21,18 +21,18 @@ namespace AdobeHDS
 			//options [0] ["rename"] = "rename fragments sequentially before processing";
 			//options [0] ["update"] = "update the script to current git version";
 			
-			options [1] ["auth"] = "authentication string for fragment requests";
+			//options [1] ["auth"] = "authentication string for fragment requests";
 			//options [1] ["duration"] = "stop recording after specified number of seconds";
 			//options [1] ["filesize"] = "split output file in chunks of specified size (MB)";
-			options [1] ["fragments"] = "base filename for fragments";
+			//options [1] ["fragments"] = "base filename for fragments";
 			options [1] ["fixwindow"] = "timestamp gap between frames to consider as timeshift";
 			options [1] ["manifest"] = "manifest file for downloading of fragments";
 			//options [1] ["maxspeed"] = "maximum bandwidth consumption (KB) for fragment downloading";
 			options [1] ["outdir"] = "destination folder for output file";
 			options [1] ["outfile"] = "filename to use for output file";
-			options [1] ["parallel"] = "number of fragments to download simultaneously";
+			//options [1] ["parallel"] = "number of fragments to download simultaneously";
 			options [1] ["proxy"] = "proxy for downloading of manifest";
-			options [1] ["quality"] = "selected quality level (low|medium|high) or exact bitrate";
+			//options [1] ["quality"] = "selected quality level (low|medium|high) or exact bitrate";
 			//options [1] ["referrer"] = "Referer to use for emulation of browser requests";
 			//options [1] ["start"] = "start from specified fragment";
 			//options [1] ["useragent"] = "User-Agent to use for emulation of browser requests";
@@ -59,10 +59,7 @@ namespace AdobeHDS
 
 			string manifest = null;
 			string baseFilename = null;
-			int fixWindow = 0;
 			string metadata = null;
-			string outDir = null;
-			string outFile = null;
 
 			if (args_parser.args.ContainsKey ("manifest")) {
 				manifest = args_parser.args ["manifest"];
@@ -76,9 +73,25 @@ namespace AdobeHDS
 				f4f.delete_fragments_at_end = true;
 			}
 
+			if (args_parser.args.ContainsKey ("proxy")) {
+				f4f.proxy = args_parser.args ["proxy"];
+				if (args_parser.args.ContainsKey ("fproxy")) {
+					f4f.fragments_proxy = true;
+				}
+			}
 
+			if (args_parser.args.ContainsKey ("fixWindow")) {
+				f4f.fixWindow = int.Parse(args_parser.args ["fixWindow"]);
+			}
 
+			if (args_parser.args.ContainsKey ("outdir")) {
+				f4f.outDir = args_parser.args ["outDir"];
+			}
 
+			if (args_parser.args.ContainsKey ("outfile")) {
+				f4f.outFileGlobal = args_parser.args ["outfile"];
+			}
+			
 
 
 
