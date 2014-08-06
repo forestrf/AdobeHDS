@@ -35,7 +35,7 @@ public class F4F : Functions
 	public byte[] bootstrapInfo;
 	public Manifest_parsed_media media;
 	public SegTable_content segTable;
-	public Dictionary<int,Frag_table_content> fragTable;
+	public List<Frag_table_content> fragTable;
 	public List<Frag_response> frags = new List<Frag_response> ();
 	public FileStream file;
 	WebClient webClientFragments = new WebClient();
@@ -75,7 +75,8 @@ public class F4F : Functions
 
 			doc.LoadXml (manifest_xml);
 		} catch (Exception e) {
-			LogError ("Unable to download the manifest: " + e);
+			LogError ("Unable to download the manifest: " + manifest);
+			LogError (e.ToString());
 			return;
 		}
 
@@ -220,7 +221,7 @@ public class F4F : Functions
 			return;
 		}
 		segTable = new SegTable_content ();
-		fragTable = new Dictionary<int,Frag_table_content> ();
+		fragTable = new List<Frag_table_content> ();
 
 
 		int timescale = ReadInt32 (bootstrapInfo, pos + 9);
@@ -246,7 +247,7 @@ public class F4F : Functions
 			string boxType = null;
 			ReadBoxHeader (bootstrapInfo, ref pos, ref boxType, ref boxSize);
 			if (boxType == "asrt")
-				ParseAsrtBox (segTable, bootstrapInfo, pos);
+				ParseAsrtBox (bootstrapInfo, pos);
 			pos += (int)boxSize;
 		}
 		byte fragRunTableCount = bootstrapInfo [pos++];
@@ -263,7 +264,7 @@ public class F4F : Functions
 		ParseSegAndFragTable ();
 	}
 
-	public void ParseAsrtBox (SegTable_content segTable, byte[] asrt, int pos)
+	public void ParseAsrtBox (byte[] asrt, int pos)
 	{
 		byte version = asrt [pos];
 		int flags = ReadInt24 (asrt, pos + 1);
@@ -304,14 +305,14 @@ public class F4F : Functions
 		LogDebug ("Number - Timestamp - Duration - Discontinuity");
 		for (int i = 0; i < fragEntries; i++) {
 			int firstFragment = ReadInt32 (afrt, pos);
-			fragTable [firstFragment] = new Frag_table_content (firstFragment, ReadInt64 (afrt, pos + 4), ReadInt32 (afrt, pos + 12), new byte ());
+			fragTable.Add(new Frag_table_content (firstFragment, ReadInt64 (afrt, pos + 4), ReadInt32 (afrt, pos + 12), new byte ()));
 			pos += 16;
-			if (fragTable [firstFragment].fragmentDuration == 0) {
-				fragTable [firstFragment].discontinuityIndicator = afrt [pos++];
+			if (fragTable [i].fragmentDuration == 0) {
+				fragTable [i].discontinuityIndicator = afrt [pos++];
 			}
 		}
-		foreach (KeyValuePair<int, Frag_table_content> fragEntry in fragTable) {
-			LogDebug (fragEntry.Value.firstFragment + " - " + fragEntry.Value.firstFragmentTimestamp + " - " + fragEntry.Value.fragmentDuration + " - " + fragEntry.Value.discontinuityIndicator);
+		foreach (Frag_table_content fragEntry in fragTable) {
+			LogDebug (fragEntry.firstFragment + " - " + fragEntry.firstFragmentTimestamp + " - " + fragEntry.fragmentDuration + " - " + fragEntry.discontinuityIndicator);
 		}
 		LogDebug ("");
 	}
@@ -322,11 +323,11 @@ public class F4F : Functions
 		fragCount = segTable.fragmentsPerSegment;
 
 		if ((fragCount & 0x80000000) == 0) {
-			fragCount += fragTable [1].firstFragment - 1;
+			fragCount += fragTable [0].firstFragment - 1;
 		}
 
-		if (fragCount < fragTable [fragTable.Count].firstFragment) {
-			fragCount = fragTable [fragTable.Count].firstFragment;
+		if (fragCount < fragTable [fragTable.Count-1].firstFragment) {
+			fragCount = fragTable [fragTable.Count-1].firstFragment;
 		}
 
 		// Determine starting segment and fragment
@@ -334,7 +335,7 @@ public class F4F : Functions
 			segTable.firstSegment = 1;
 		}
 
-		int fragStart = fragTable [1].firstFragment - 1;
+		int fragStart = fragTable [0].firstFragment - 1;
 		if (fragStart < 0) {
 			segTable.firstSegment = 1;
 		}
@@ -350,10 +351,10 @@ public class F4F : Functions
 		}
 
 		int segNum = segTable.firstSegment;
-		int fragNum = fragTable [1].firstFragment;
+		int fragNum = fragTable [0].firstFragment;
 
 		lastFrag = fragNum;
-		LogInfo ("Fragments Total: " + fragCount + ", First: " + fragTable [1].firstFragment + ", Start: " + (fragNum + 1));
+		LogInfo ("Fragments Total: " + fragCount + ", First: " + fragTable [0].firstFragment + ", Start: " + (fragNum + 1));
 
 		// Extract baseFilename
 		baseFilename = media.url;
@@ -373,6 +374,8 @@ public class F4F : Functions
 		baseFilename += "Seg" + segNum + "-Frag";
 
 		if (fragNum >= fragCount) {
+			LogDebug ("fragNum = "+fragNum);
+			LogDebug ("fragCount = "+fragCount);
 			LogError ("No fragment available for downloading");
 		}
 
@@ -660,8 +663,10 @@ public class F4F : Functions
 				}
 				flvData = DecodeFragment (frag.response, frag.id);
 				file = WriteFlvFile (outFile, audio, video);
-				if (media.metadata.Length != 0) {
-					WriteMetadata (file);
+				if (media.metadata != null) {
+					if (media.metadata.Length != 0) {
+						WriteMetadata (file);
+					}
 				}
 			} else {
 				flvData = DecodeFragment (frag.response, frag.id);
