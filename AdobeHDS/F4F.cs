@@ -38,7 +38,7 @@ public class F4F : Functions
 	public SegTable_content segTable;
 	public List<Frag_table_content> fragTable;
 	public List<Frag_response> frags = new List<Frag_response> ();
-	public FileStream file;
+	public Stream file;
 	WebClient webClientFragments = new WebClient();
 
 
@@ -398,7 +398,7 @@ public class F4F : Functions
 				LogDebug ("Fragment fragNum is already downloaded");
 				frag.response = file_get_contents (frag.filename);
 			} else {
-				LogDebug ("Downloading fragment fragNum");
+				LogDebug ("Downloading fragment "+fragNum);
 				segNum = segTable.firstSegment;
 				string url = fragUrl + "Seg" + segNum + "-Frag" + fragNum + media.queryString;
 				LogDebug ("Frag to download: " + url);
@@ -409,7 +409,7 @@ public class F4F : Functions
 			}
 			LogDebug ("Fragment " + frag.filename + " successfully downloaded");
 			if (frag.response.Length != 0) {
-				WriteFragment (frag);
+				WriteFragment (ref file, frag);
 				if (error) {
 					LogError ("An error ocurred");
 					File.Delete (frag.filename);
@@ -424,12 +424,11 @@ public class F4F : Functions
 			} else {
 				fragNum--;
 				File.Delete (frag.filename);
-				LogDebug ("Fragment " + frag.id + " bad downloaded");
+				LogDebug ("Fragment " + frag.id + " bad downloaded. Trying downloading it again.");
 			}
 		}
 
-		LogInfo ("");
-		LogDebug ("\nAll fragments downloaded successfully\n");
+		LogInfo ("All fragments downloaded successfully");
 
 		if (delete_fragments_at_end) {
 			foreach (Frag_response frag in frags) {
@@ -600,7 +599,7 @@ public class F4F : Functions
 							cts = (cts + 0xff800000) ^ 0xff800000;
 							pts = packetTS + cts;
 							if (cts != 0) {
-								LogDebug ("DTS: $packetTS CTS: " + cts + " PTS: " + pts);
+								LogDebug ("DTS: "+packetTS+" CTS: " + cts + " PTS: " + pts);
 							}
 						}
 
@@ -655,12 +654,13 @@ public class F4F : Functions
 		return flvData;
 	}
 
-	public void WriteFragment (Frag_response frag)
+	public void WriteFragment (ref Stream flv, Frag_response frag)
 	{
 		if (frag.response.Length != 0) {
 			LogDebug ("Writing fragment " + frag.id + " to flv file");
 			byte[] flvData;
-			if (file == null) {
+			if (flv == null) {
+				// In case of saving the file. Do another thing to stream it for the play option.
 				string outFile = "";
 				if (outFileGlobal.Length > 0) {
 					outFile = JoinUrl (outDir, outFileGlobal + ".flv");
@@ -672,7 +672,11 @@ public class F4F : Functions
 					LogError ("An error ocurred");
 					return;
 				}
-				file = WriteFlvFile (outFile, audio, video);
+				byte[] flvHeader = CreateFlvHeader(audio, video);
+
+				file = File.Create (outFile);
+				file.Write (flvHeader, 0, flvHeader.Length);
+
 				if (media.metadata != null) {
 					if (media.metadata.Length != 0) {
 						WriteMetadata (file);
@@ -686,7 +690,7 @@ public class F4F : Functions
 				}
 			}
 			if (flvData.Length != 0) {
-				file.Write (flvData, 0, flvData.Length);
+				((FileStream)flv).Write (flvData, 0, flvData.Length);
 			}
 			lastFrag = frag.id;
 		} else {
@@ -695,7 +699,17 @@ public class F4F : Functions
 		}
 	}
 
-	public void WriteMetadata (FileStream flv)
+	public byte[] CreateFlvHeader(bool audio, bool video)
+	{
+		byte[] flvHeader = new byte[]{ 0x46, 0x4c, 0x56, 0x01, 0x05, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00 };
+
+		// Set proper Audio/Video marker
+		flvHeader [4] = (byte)((audio ? 1 : 0) << 2 | (video ? 1 : 0));
+
+		return flvHeader;
+	}
+
+	public void WriteMetadata (Stream flv)
 	{
 		if (media.metadata.Length != 0) {
 			int metadataSize = media.metadata.Length;
@@ -710,10 +724,11 @@ public class F4F : Functions
 
 			Buffer.BlockCopy (a, 0, res, 0, a.Length);
 			Buffer.BlockCopy (media.metadata, 0, res, a.Length, media.metadata.Length);
-			media.metadata = res;
 
-			media.metadata [tagHeaderLen + metadataSize - 1] = 0x09;
-			WriteToByteArray (media.metadata, tagHeaderLen + metadataSize, BitConverter.GetBytes (tagHeaderLen + metadataSize));
+			res [tagHeaderLen + metadataSize - 1] = 0x09;
+			WriteToByteArray (res, tagHeaderLen + metadataSize, BitConverter.GetBytes (tagHeaderLen + metadataSize));
+
+			media.metadata = res;
 			flv.Write (media.metadata, 0, media.metadata.Length);
 		}
 	}

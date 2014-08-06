@@ -213,20 +213,6 @@ public class Functions : Defines
 		return outFile;
 	}
 
-	public FileStream WriteFlvFile (string outFile, bool audio, bool video)
-	{
-
-		byte[] flvHeader = new byte[]{ 0x46, 0x4c, 0x56, 0x01, 0x05, 0x00, 0x00, 0x00, 0x09, 0x00, 0x00, 0x00, 0x00 };
-
-		// Set proper Audio/Video marker
-		flvHeader [4] = (byte)((audio ? 1 : 0) << 2 | (video ? 1 : 0));
-
-		FileStream file = File.Create (outFile);
-
-		file.Write (flvHeader, 0, flvHeader.Length);
-		return file;
-	}
-
 	public void WriteInt24 (byte[] bytes, int pos, int number)
 	{
 		byte[] n = BitConverter.GetBytes (number);
