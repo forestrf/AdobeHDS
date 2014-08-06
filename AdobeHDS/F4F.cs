@@ -20,7 +20,8 @@ public class F4F : Functions
 		baseFilename,
 		outFileGlobal = "",
 		outDir = "",
-		proxy = "";
+		proxy = "",
+		quality = "";
 	public bool processed = false,
 		audio = false,
 		video = false,
@@ -61,7 +62,9 @@ public class F4F : Functions
 			WebClient webClientManifest = new WebClient();
 			if(proxy.Length > 0){
 				webClientManifest.Proxy = new WebProxy(proxy);
+				LogDebug ("Proxy setted");
 			}
+			LogDebug ("Downloading manifest");
 			string manifest_xml = webClientManifest.DownloadString(manifest);
 
 			// Remove annoying manifests
@@ -95,15 +98,18 @@ public class F4F : Functions
 
 		XmlNodeList nodes = doc.DocumentElement.SelectNodes ("/manifest/media");
 
-		Console.WriteLine (nodes.Count);
+		LogDebug ("Nodes found:"+nodes.Count);
 
 		foreach (XmlNode node in nodes) {
 
 			Manifest_parsed_media manifest_parsed_media = new Manifest_parsed_media ();
 
-			if (node.Attributes ["bitrate"] != null) {
+			if (node.Attributes ["bitrate"] != null && node.Attributes ["bitrate"].InnerText != "") {
 				manifest_parsed_media.bitrate = int.Parse (node.Attributes ["bitrate"].InnerText);
+			} else {
+				manifest_parsed_media.bitrate = 0;
 			}
+			LogDebug ("Parsed bitrate of node: " + manifest_parsed_media.bitrate);
 			manifest_parsed_media.baseUrl = baseUrl;
 			manifest_parsed_media.url = node.Attributes ["url"].InnerText;
 
@@ -149,18 +155,39 @@ public class F4F : Functions
 			return;
 		}
 
-		manifest_parsed = true;
-
 		media = manifest_parsed_media_list [0];
 
+		manifest_parsed_media_list.Sort(delegate(Manifest_parsed_media x, Manifest_parsed_media y) {
+			return y.bitrate.CompareTo(x.bitrate);
+		});
+
 		foreach (Manifest_parsed_media media_2 in manifest_parsed_media_list) {
-			if (media.bitrate < media_2.bitrate) {
-				media = media_2;
-			}
 			LogInfo ("Bitrate availabe: " + media_2.bitrate + ", url: " + media_2.url);
 		}
 
-		LogInfo ("Bitrate autoselected: " + media.bitrate);
+		switch (quality) {
+		case "high":
+		case "":
+			media = manifest_parsed_media_list [0];
+			break;
+		case "medium":
+			media = manifest_parsed_media_list [((manifest_parsed_media_list.Count-1)/2)|0];
+			break;
+		case "low":
+			media = manifest_parsed_media_list [manifest_parsed_media_list.Count - 1];
+			break;
+		default:
+			// number
+			foreach (Manifest_parsed_media media_2 in manifest_parsed_media_list) {
+				if (media_2.bitrate == int.Parse(quality)) {
+					media = media_2;
+					break;
+				}
+			}
+			break;
+		}
+
+		LogInfo ("Bitrate selected: " + media.bitrate);
 
 		// Parse bootstrap info
 		int pos = 0;
@@ -175,9 +202,10 @@ public class F4F : Functions
 			return;
 		}
 
-		// Parse initial bootstrap info
 		baseUrl = media.baseUrl;
 		bootstrapInfo = media.bootstrap;
+
+		manifest_parsed = true;
 	}
 
 	public void ParseBootstrapBox (byte[] bootstrapInfo, int pos)

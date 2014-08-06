@@ -32,7 +32,7 @@ namespace AdobeHDS
 			options [1] ["outfile"] = "filename to use for output file";
 			//options [1] ["parallel"] = "number of fragments to download simultaneously";
 			options [1] ["proxy"] = "proxy for downloading of manifest";
-			//options [1] ["quality"] = "selected quality level (low|medium|high) or exact bitrate";
+			options [1] ["quality"] = "selected quality level (low|medium|high) or exact bitrate";
 			//options [1] ["referrer"] = "Referer to use for emulation of browser requests";
 			//options [1] ["start"] = "start from specified fragment";
 			//options [1] ["useragent"] = "User-Agent to use for emulation of browser requests";
@@ -90,6 +90,10 @@ namespace AdobeHDS
 
 			if (args_parser.args.ContainsKey ("outfile")) {
 				f4f.outFileGlobal = args_parser.args ["outfile"];
+			}
+
+			if (args_parser.args.ContainsKey ("quality")) {
+				f4f.quality = args_parser.args ["quality"];
 			}
 			
 
