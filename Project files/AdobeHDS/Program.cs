@@ -8,6 +8,11 @@ namespace AdobeHDS
 	{
 		public static void Main (string[] args)
 		{
+
+			Console.WriteLine ("AdobeHDS v0.0.4 7-Aug-2014");
+			Console.WriteLine ("(c) 2014 Andrés Leone, K-S-V; License: GPL");
+			Console.WriteLine ("");
+
 			Dictionary<string, string>[] options = new Dictionary<string, string>[2] {
 				new Dictionary<string, string> (),
 				new Dictionary<string, string> ()
@@ -85,6 +90,10 @@ namespace AdobeHDS
 
 			if (args_parser.args.ContainsKey ("outdir")) {
 				f4f.outDir = args_parser.args ["outdir"];
+				if (f4f.outDir [f4f.outDir.Length - 1] == '\\' || f4f.outDir [f4f.outDir.Length - 1] == '/') {
+					// Remove last \ or / from the path
+					f4f.outDir = f4f.outDir.Substring(0, f4f.outDir.Length - 1);
+				}
 			}
 
 			if (args_parser.args.ContainsKey ("outfile")) {

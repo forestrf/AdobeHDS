@@ -14,14 +14,20 @@ public class Args_parser
 		}*/
 
 		string current_option = null;
+		int current_option_values = 0;
 		for (int i = 0; i < arguments.Length; i++) {
 			if (arguments [i].IndexOf ("--") == 0) {
 				// option
 				current_option = arguments [i].Substring(2);
 				args [current_option] = "";
+				current_option_values = 0;
 			} else if (current_option != null) {
 				// value
+				if (current_option_values > 0) {
+					args [current_option] += " ";
+				}
 				args [current_option] += arguments [i];
+				current_option_values++;
 			}
 		}
 	}
