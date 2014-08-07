@@ -394,36 +394,37 @@ public class F4F : Functions
 			frag.id = fragNum;
 			LogInfo ("Downloading " + fragNum + "/" + fragCount + " fragments");
 			frag.filename = baseFilename + fragNum;
-			if (File.Exists (frag.filename)) {
+			frag.filenamePath = JoinUrl (outDir, frag.filename);
+			if (File.Exists (frag.filenamePath)) {
 				LogDebug ("Fragment fragNum is already downloaded");
-				frag.response = file_get_contents (frag.filename);
+				frag.response = file_get_contents (frag.filenamePath);
 			} else {
 				LogDebug ("Downloading fragment "+fragNum);
 				segNum = segTable.firstSegment;
 				string url = fragUrl + "Seg" + segNum + "-Frag" + fragNum + media.queryString;
 				LogDebug ("Frag to download: " + url);
 
-				webClientFragments.DownloadFile (url, frag.filename);
+				webClientFragments.DownloadFile (url, frag.filenamePath);
 
-				frag.response = file_get_contents (frag.filename);
+				frag.response = file_get_contents (frag.filenamePath);
 			}
 			LogDebug ("Fragment " + frag.filename + " successfully downloaded");
 			if (frag.response.Length != 0) {
 				WriteFragment (ref file, frag);
 				if (error) {
 					LogError ("An error ocurred");
-					File.Delete (frag.filename);
+					File.Delete (frag.filenamePath);
 					return;
 				}
 				frag.response = new byte[0];
 				frags.Add (frag);
 				fragNum++;
 				if (delete_fragments_at_end) {
-					File.Delete (frag.filename);
+					File.Delete (frag.filenamePath);
 				}
 			} else {
 				fragNum--;
-				File.Delete (frag.filename);
+				File.Delete (frag.filenamePath);
 				LogDebug ("Fragment " + frag.id + " bad downloaded. Trying downloading it again.");
 			}
 		}
@@ -432,8 +433,8 @@ public class F4F : Functions
 
 		if (delete_fragments_at_end) {
 			foreach (Frag_response frag in frags) {
-				if (File.Exists (frag.filename)) {
-					File.Delete (frag.filename);
+				if (File.Exists (frag.filenamePath)) {
+					File.Delete (frag.filenamePath);
 				}
 			}
 		}
@@ -790,6 +791,7 @@ public class Frag_response
 	public byte[] response;
 	public int id;
 	public string filename;
+	public string filenamePath;
 
 	public Frag_response ()
 	{

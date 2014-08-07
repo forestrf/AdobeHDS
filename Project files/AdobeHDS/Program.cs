@@ -58,7 +58,6 @@ namespace AdobeHDS
 			F4F f4f = new F4F ();
 
 			string manifest = null;
-			string baseFilename = null;
 			string metadata = null;
 
 			if (args_parser.args.ContainsKey ("manifest")) {
@@ -85,7 +84,7 @@ namespace AdobeHDS
 			}
 
 			if (args_parser.args.ContainsKey ("outdir")) {
-				f4f.outDir = args_parser.args ["outDir"];
+				f4f.outDir = args_parser.args ["outdir"];
 			}
 
 			if (args_parser.args.ContainsKey ("outfile")) {
