@@ -125,6 +125,8 @@ public class Functions : Defines
 
 	public string JoinUrl (string firstUrl, string secondUrl)
 	{
+		firstUrl = firstUrl.Replace ("\\", "/");
+		secondUrl = secondUrl.Replace ("\\", "/");
 		if (firstUrl != "" && secondUrl != "") {
 			if (firstUrl [firstUrl.Length - 1] == '/') {
 				firstUrl = firstUrl.Substring (0, -1);
