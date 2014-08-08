@@ -26,7 +26,7 @@ namespace AdobeHDS
 			//options [0] ["rename"] = "rename fragments sequentially before processing";
 			//options [0] ["update"] = "update the script to current git version";
 			
-			//options [1] ["auth"] = "authentication string for fragment requests";
+			options [1] ["auth"] = "authentication string for fragment requests";
 			//options [1] ["duration"] = "stop recording after specified number of seconds";
 			//options [1] ["filesize"] = "split output file in chunks of specified size (MB)";
 			//options [1] ["fragments"] = "base filename for fragments";
@@ -102,6 +102,10 @@ namespace AdobeHDS
 
 			if (args_parser.args.ContainsKey ("quality")) {
 				f4f.quality = args_parser.args ["quality"];
+			}
+
+			if (args_parser.args.ContainsKey ("auth")) {
+				f4f.auth = args_parser.args ["auth"];
 			}
 			
 

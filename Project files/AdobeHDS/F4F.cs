@@ -21,7 +21,8 @@ public class F4F : Functions
 		outFileGlobal = "",
 		outDir = "",
 		proxy = "",
-		quality = "";
+		quality = "",
+		auth = "";
 	public bool processed = false,
 		audio = false,
 		video = false,
@@ -41,8 +42,6 @@ public class F4F : Functions
 	public Stream file;
 	WebClient webClientFragments = new WebClient();
 
-
-	public string auth = ""; // Reimplement
 
 
 	public F4F ()
@@ -124,6 +123,11 @@ public class F4F : Functions
 			if (idx > -1) {
 				manifest_parsed_media.queryString = manifest_parsed_media.url.Substring (idx);
 				manifest_parsed_media.url = manifest_parsed_media.url.Substring (0, idx);
+				if (auth.Length != 0) {
+					LogDebug ("Manifest overrides 'auth': " + manifest_parsed_media.queryString);
+				}
+			} else {
+				manifest_parsed_media.queryString = auth;
 			}
 
 			XmlElement bootstrapInfoId = node ["bootstrapInfoId"];
@@ -396,6 +400,7 @@ public class F4F : Functions
 			frag.filename = baseFilename + fragNum;
 			frag.filenamePath = JoinUrl (outDir, frag.filename);
 			if (File.Exists (frag.filenamePath)) {
+				// If the file is corrupted or incompleted it will fail without recover
 				LogDebug ("Fragment fragNum is already downloaded");
 				frag.response = file_get_contents (frag.filenamePath);
 			} else {
