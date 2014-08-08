@@ -38,9 +38,9 @@ namespace AdobeHDS
 			//options [1] ["parallel"] = "number of fragments to download simultaneously";
 			options [1] ["proxy"] = "proxy for downloading of manifest";
 			options [1] ["quality"] = "selected quality level (low|medium|high) or exact bitrate";
-			//options [1] ["referrer"] = "Referer to use for emulation of browser requests";
+			options [1] ["referrer"] = "Referer to use for emulation of browser requests";
 			//options [1] ["start"] = "start from specified fragment";
-			//options [1] ["useragent"] = "User-Agent to use for emulation of browser requests";
+			options [1] ["useragent"] = "User-Agent to use for emulation of browser requests";
 
 
 			Args_parser args_parser = new Args_parser (args);
@@ -107,7 +107,14 @@ namespace AdobeHDS
 			if (args_parser.args.ContainsKey ("auth")) {
 				f4f.auth = args_parser.args ["auth"];
 			}
-			
+
+			if (args_parser.args.ContainsKey ("useragent")) {
+				f4f.userAgent = args_parser.args ["useragent"];
+			}
+
+			if (args_parser.args.ContainsKey ("referrer")) {
+				f4f.referrer = args_parser.args ["referrer"];
+			}
 
 
 

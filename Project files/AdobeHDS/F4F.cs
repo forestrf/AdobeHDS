@@ -22,7 +22,9 @@ public class F4F : Functions
 		outDir = "",
 		proxy = "",
 		quality = "",
-		auth = "";
+		auth = "",
+		userAgent = "",
+		referrer = "";
 	public bool processed = false,
 		audio = false,
 		video = false,
@@ -63,6 +65,12 @@ public class F4F : Functions
 			if(proxy.Length > 0){
 				webClientManifest.Proxy = new WebProxy(proxy);
 				LogDebug ("Proxy setted");
+			}
+			if(userAgent.Length > 0){
+				webClientManifest.Headers.Add ("user-agent", userAgent);
+			}
+			if(referrer.Length > 0){
+				webClientManifest.Headers.Add ("referer", referrer);
 			}
 			LogDebug ("Downloading manifest");
 			string manifest_xml = webClientManifest.DownloadString(manifest);
@@ -390,6 +398,12 @@ public class F4F : Functions
 
 		if(proxy.Length > 0 && fragments_proxy){
 			webClientFragments.Proxy = new WebProxy(proxy);
+		}
+		if (userAgent.Length > 0) {
+			webClientFragments.Headers.Add ("user-agent", userAgent);
+		}
+		if(referrer.Length > 0){
+			webClientFragments.Headers.Add ("referer", referrer);
 		}
 
 		while (fragNum <= fragCount) {
