@@ -35,7 +35,8 @@ public class F4F : Functions
 		delete_fragments_at_end = false,
 		manifest_parsed = false,
 		fragments_proxy = false,
-		error = false;
+		error = false,
+		play = false;
 	public byte[] bootstrapInfo;
 	public Manifest_parsed_media media;
 	public SegTable_content segTable;
@@ -680,12 +681,17 @@ public class F4F : Functions
 			LogDebug ("Writing fragment " + frag.id + " to flv file");
 			byte[] flvData;
 			if (flv == null) {
-				// In case of saving the file. Do another thing to stream it for the play option.
-				string outFile = "";
-				if (outFileGlobal.Length > 0) {
-					outFile = JoinUrl (outDir, outFileGlobal + ".flv");
+				if (play) {
+					flv = Console.OpenStandardOutput ();
 				} else {
-					outFile = JoinUrl (outDir, baseFilename + ".flv");
+					// In case of saving the file. Do another thing to stream it for the play option.
+					string outFile = "";
+					if (outFileGlobal.Length > 0) {
+						outFile = JoinUrl (outDir, outFileGlobal + ".flv");
+					} else {
+						outFile = JoinUrl (outDir, baseFilename + ".flv");
+					}
+					file = File.Create (outFile);
 				}
 				flvData = DecodeFragment (frag.response, frag.id);
 				if (error) {
@@ -694,7 +700,6 @@ public class F4F : Functions
 				}
 				byte[] flvHeader = CreateFlvHeader(audio, video);
 
-				file = File.Create (outFile);
 				file.Write (flvHeader, 0, flvHeader.Length);
 
 				if (media.metadata != null) {

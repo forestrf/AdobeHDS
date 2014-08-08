@@ -22,7 +22,7 @@ namespace AdobeHDS
 			options [0] ["debug"] = "show debug output";
 			options [0] ["delete"] = "delete fragments after processing";
 			options [0] ["fproxy"] = "force proxy for downloading of fragments";
-			//options [0] ["play"] = "dump stream to stdout for piping to media player";
+			options [0] ["play"] = "dump stream to stdout for piping to media player";
 			//options [0] ["rename"] = "rename fragments sequentially before processing";
 			//options [0] ["update"] = "update the script to current git version";
 			
@@ -114,6 +114,10 @@ namespace AdobeHDS
 
 			if (args_parser.args.ContainsKey ("referrer")) {
 				f4f.referrer = args_parser.args ["referrer"];
+			}
+
+			if (args_parser.args.ContainsKey ("play")) {
+				f4f.play = true;
 			}
 
 
