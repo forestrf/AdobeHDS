@@ -178,7 +178,7 @@ public class Functions : Defines
 				outSegs.Add (seg);
 			}
 		}
-		string outPath = string.Join ("/", outSegs);
+		string outPath = string.Join ("/", outSegs.ToArray());
 
 		if (path [0] == '/') {
 			outPath = "/" + outPath;
