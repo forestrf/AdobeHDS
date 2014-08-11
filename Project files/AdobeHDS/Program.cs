@@ -9,7 +9,7 @@ namespace AdobeHDS
 		public static void Main (string[] args)
 		{
 
-			Console.WriteLine ("AdobeHDS v0.0.4 7-Aug-2014");
+			Console.WriteLine ("AdobeHDS v0.0.5 11-Aug-2014");
 			Console.WriteLine ("(c) 2014 Andrés Leone, K-S-V; License: GPL");
 			Console.WriteLine ("");
 
