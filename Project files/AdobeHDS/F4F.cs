@@ -290,14 +290,20 @@ public class F4F : Functions
 		int segCount = ReadInt32 (asrt, pos);
 		pos += 4;
 		LogDebug ("Number - Fragments");
-		for (int i = 0; i < segCount; i++) {
-			int firstSegment = ReadInt32 (asrt, pos);
-			segTable = new SegTable_content (firstSegment, ReadInt32 (asrt, pos + 4));
-			if ((segTable.fragmentsPerSegment & 0x80000000) != 0) {
-				segTable.fragmentsPerSegment = 0;
-			}
-			pos += 8;
+		pos += (segCount-1) * 8;
+
+		int firstSegment = ReadInt32 (asrt, pos);
+		int fragmentsPerSegment = ReadInt32 (asrt, pos + 4);
+		if (fragmentsPerSegment < firstSegment) {
+			int t = firstSegment;
+			firstSegment = fragmentsPerSegment;
+			fragmentsPerSegment = t;
 		}
+		segTable = new SegTable_content (firstSegment, fragmentsPerSegment);
+		if ((segTable.fragmentsPerSegment & 0x80000000) != 0) {
+			segTable.fragmentsPerSegment = 0;
+		}
+		pos += 8;
 
 		LogDebug (segTable.firstSegment + " - " + segTable.fragmentsPerSegment);
 
@@ -368,7 +374,7 @@ public class F4F : Functions
 		int fragNum = fragTable [0].firstFragment;
 
 		lastFrag = fragNum;
-		LogInfo ("Fragments Total: " + fragCount + ", First: " + fragTable [0].firstFragment + ", Start: " + (fragNum + 1));
+		LogInfo ("Fragments Total: " + fragCount + ", First: " + fragTable [0].firstFragment);
 
 		// Extract baseFilename
 		baseFilename = media.url;
@@ -432,7 +438,7 @@ public class F4F : Functions
 				WriteFragment (ref file, frag);
 				if (error) {
 					LogError ("An error ocurred. Maybe the fragment is incomplete.");
-					fragNum--;
+					fragNum = Math.Max(1, fragNum-1);
 					File.Delete (frag.filenamePath);
 					error = false;
 					continue;
@@ -444,7 +450,7 @@ public class F4F : Functions
 					File.Delete (frag.filenamePath);
 				}
 			} else {
-				fragNum--;
+				fragNum = Math.Max(1, fragNum-1);
 				File.Delete (frag.filenamePath);
 				LogDebug ("Fragment " + frag.id + " bad downloaded. Trying downloading it again.");
 			}
